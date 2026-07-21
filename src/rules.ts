@@ -196,6 +196,14 @@ export function resolveTurn(
   species: Record<string, SpeciesDefinition>, moves: Record<string, MoveDefinition>, rng: Rng,
 ): BattleEvent[] {
   const events: BattleEvent[] = [];
+  if (!alive(active(context.player)) && playerAction.kind === 'switch') {
+    const next = context.player.party[playerAction.partyIndex];
+    if (next && alive(next) && playerAction.partyIndex !== context.player.active) {
+      context.player.active = playerAction.partyIndex; context.player.stages = { ...BASE_STAGES };
+      events.push({ kind: 'switch', side: 'player', text: `Go ${displayName(next, species[next.speciesId])}!` });
+    }
+    return events;
+  }
   context.turn += 1;
   context.player.protected = false;
   context.enemy.protected = false;

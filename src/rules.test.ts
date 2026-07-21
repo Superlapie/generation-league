@@ -65,6 +65,11 @@ describe('generation-style progression rules',()=>{
     const events=resolveTurn(battle,{kind:'move',moveIndex:0},{kind:'move',moveIndex:0},SPECIES,MOVES,fixedRng(.01));
     expect(events.find((event)=>event.kind==='move')?.side).toBe('player');expect(battle.player.party[0].moves[0].pp).toBe(4);expect(battle.enemy.party[0].currentHp).toBeLessThan(calculateStats(battle.enemy.party[0],SPECIES.jellume).hp);
   });
+  it('replaces a fainted player creature without granting the enemy another attack',()=>{
+    const battle=contextFor('cragbud','jellume'),replacement=createCreature('cinderskink',20,'Test','test',new SeededRng(8));battle.player.party.push(replacement);battle.player.party[0].currentHp=0;battle.enemy.party[0].moves=[{moveId:'prismsting',pp:5}];battle.field={effect:'monsoon',turns:3};
+    const hp=replacement.currentHp,events=resolveTurn(battle,{kind:'switch',partyIndex:1},{kind:'move',moveIndex:0},SPECIES,MOVES,fixedRng(.01));
+    expect(events.map((event)=>event.kind)).toEqual(['switch']);expect(battle.player.active).toBe(1);expect(replacement.currentHp).toBe(hp);expect(battle.enemy.party[0].moves[0].pp).toBe(5);expect(battle.turn).toBe(0);expect(battle.field.turns).toBe(3);
+  });
   it('supports healing, recoil, drain, multi-hit, stat stages and field effects',()=>{
     const effects=['heal','recoil','drain','multiHit','raise','lower','weather'];
     effects.forEach((effect)=>expect(Object.values(MOVES).some((move)=>move.effect===effect),effect).toBe(true));

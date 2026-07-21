@@ -40,7 +40,7 @@ const mossBuildings = [
 ];
 const mossWarps = [
   warp('moss:verdant', 12, 0, 'verdant-path', 2, 8, 'verdant:moss'),
-  ...mossBuildings.map((b) => warp(`moss:${b.id}`, b.doorX, b.y + b.height - 1, b.interiorMap, 7, 8, `${b.id}:exit`)),
+  ...mossBuildings.map((b) => warp(`moss:${b.id}`, b.doorX, b.y + b.height - 2, b.interiorMap, 7, 8, `${b.id}:exit`)),
 ];
 mossWarps.forEach((w) => markWarp(mossmereTiles, w.x, w.y, w.id.includes('verdant') ? 'path' : 'door'));
 
@@ -76,7 +76,7 @@ const cinderBuildings = [
 ];
 const cinderWarps = [
   warp('cinder:reedwater', 0, 10, 'reedwater-crossing', 32, 9, 'reedwater:cinder'), warp('cinder:grotto', 23, 10, 'ashfall-grotto', 2, 12, 'grotto:cinder'),
-  ...cinderBuildings.map((b) => warp(`cinder:${b.id}`, b.doorX, b.y + b.height - 1, b.interiorMap, 7, 8, `${b.id}:exit`)),
+  ...cinderBuildings.map((b) => warp(`cinder:${b.id}`, b.doorX, b.y + b.height - 2, b.interiorMap, 7, 8, `${b.id}:exit`)),
 ];
 cinderWarps.forEach((w) => markWarp(cinderTiles, w.x, w.y, w.id.includes('grotto') ? 'cave' : w.id.includes('reedwater') ? 'path' : 'door'));
 
@@ -103,7 +103,7 @@ const tideBuildings = [
   building('tide-home', 19, 13, 5, 'Canal House', 'tide-home'), building('tide-home-2', 3, 4, 5, 'Harbor House', 'tide-home-2'),
   building('league-spire', 17, 2, 8, 'League Spire', 'league-spire'),
 ];
-const tideWarps = [warp('tide:ember', 0, 11, 'ember-ridge', 32, 9, 'ember:tide'), ...tideBuildings.map((b) => warp(`tide:${b.id}`, b.doorX, b.y + b.height - 1, b.interiorMap, 7, 8, `${b.id}:exit`))];
+const tideWarps = [warp('tide:ember', 0, 11, 'ember-ridge', 32, 9, 'ember:tide'), ...tideBuildings.map((b) => warp(`tide:${b.id}`, b.doorX, b.y + b.height - 2, b.interiorMap, 7, 8, `${b.id}:exit`))];
 tideWarps.forEach((w) => markWarp(tideTiles, w.x, w.y, w.id.includes('ember') ? 'path' : 'door'));
 
 export const MAPS: Record<string, MapDefinition> = {
@@ -195,7 +195,7 @@ export function validateWorld(maps = MAPS) {
     }
     for (const building of map.buildings) {
       if (!maps[building.interiorMap]) errors.push(`${map.id}/${building.id}: missing interior`);
-      for(let y=building.y;y<building.y+building.height;y+=1)for(let x=building.x;x<building.x+building.width;x+=1)if(map.tiles[y]?.[x]!=='grass'&&!(x===building.doorX&&y===building.y+building.height-1&&map.tiles[y]?.[x]==='door'))errors.push(`${map.id}/${building.id}: building overlaps ${map.tiles[y]?.[x]??'void'} at ${x},${y}`);
+      for(let y=building.y;y<building.y+building.height;y+=1)for(let x=building.x;x<building.x+building.width;x+=1)if(map.tiles[y]?.[x]!=='grass'&&!(x===building.doorX&&y===building.y+building.height-2&&map.tiles[y]?.[x]==='door'))errors.push(`${map.id}/${building.id}: building overlaps ${map.tiles[y]?.[x]??'void'} at ${x},${y}`);
       if([...map.npcs,...map.trainers].some((person)=>person.x>=building.x&&person.x<building.x+building.width&&person.y>=building.y&&person.y<building.y+building.height))errors.push(`${map.id}/${building.id}: character placed inside building footprint`);
     }
   }

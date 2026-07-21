@@ -34,8 +34,8 @@ describe('campaign data',()=>{
     expect(Object.values(MAPS).flatMap((map)=>map.buildings).every((building)=>MAPS[building.interiorMap]?.kind==='interior')).toBe(true);
     for(const map of outdoor)for(const building of map.buildings){
       const entrance=map.warps.find((entry)=>entry.toMap===building.interiorMap);
-      expect(entrance).toMatchObject({x:building.doorX,y:building.y+building.height-1});
-      expect(map.tiles[building.y+building.height-1][building.doorX]).toBe('door');
+      expect(entrance).toMatchObject({x:building.doorX,y:building.y+building.height-2});
+      expect(map.tiles[building.y+building.height-2][building.doorX]).toBe('door');
     }
   });
 });

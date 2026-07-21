@@ -213,7 +213,7 @@ export class OverworldScene extends Phaser.Scene {
   }
   private passable(x:number,y:number) {
     const tile=this.map.tiles[y]?.[x];if(!tile||BLOCKED.has(tile))return false;
-    if(this.map.buildings.some((b)=>x>=b.x&&x<b.x+b.width&&y>=b.y&&y<b.y+b.height&&!(x===b.doorX&&y===b.y+b.height-1)))return false;
+    if(this.map.buildings.some((b)=>x>=b.x&&x<b.x+b.width&&y>=b.y&&y<b.y+b.height&&!(x===b.doorX&&y>=b.y+b.height-2)))return false;
     if(this.map.signs.some((sign)=>sign.x===x&&sign.y===y))return false;
     if([...this.map.npcs,...this.map.trainers.filter((t)=>this.trainerActive(t))].some((person)=>person.x===x&&person.y===y))return false;
     return true;
@@ -244,7 +244,7 @@ export class OverworldScene extends Phaser.Scene {
     const trainer=this.map.trainers.find((entry)=>entry.x===front.x&&entry.y===front.y&&this.trainerActive(entry));if(trainer){this.startTrainer(trainer);return;}
     const sign=this.map.signs.find((entry)=>entry.x===front.x&&entry.y===front.y);if(sign){this.showDialogue(sign.text);return;}
     const item=this.map.items.find((entry)=>entry.x===front.x&&entry.y===front.y&&!gameStore.hasCollected(entry.id));if(item){this.collectItem(item.id,item.itemId,item.count);return;}
-    const building=this.map.buildings.find((b)=>front.x===b.doorX&&front.y===b.y+b.height-1);if(building)this.showDialogue([building.label.toUpperCase()]);
+    const building=this.map.buildings.find((b)=>front.x===b.doorX&&front.y===b.y+b.height-2);if(building)this.showDialogue([building.label.toUpperCase()]);
   }
   private collectItem(id:string,itemId:string,count:number){gameStore.addItem(itemId,count);gameStore.collect(id);audio.sfx('confirm');this.showDialogue([`You found ${count>1?`${count} × `:''}${ITEMS[itemId].name}!`]);}
   private findSightTrainer(){

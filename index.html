@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#111812" />
+    <title>Generation League</title>
+  </head>
+  <body>
+    <main id="shell">
+      <section id="game-frame" aria-label="Generation League game">
+        <div id="game"></div>
+        <div id="touch-controls" aria-label="Touch controls">
+          <div class="dpad" aria-label="Directional pad">
+            <button data-key="UP" aria-label="Up">▲</button>
+            <button data-key="LEFT" aria-label="Left">◀</button>
+            <button data-key="RIGHT" aria-label="Right">▶</button>
+            <button data-key="DOWN" aria-label="Down">▼</button>
+          </div>
+          <button class="touch-menu" data-key="MENU">MENU</button>
+          <div class="action-pad">
+            <button class="b" data-key="B">B</button>
+            <button class="a" data-key="A">A</button>
+          </div>
+        </div>
+      </section>
+      <footer><strong>GENERATION LEAGUE</strong><span>ENTER / Z: confirm · X: back · SHIFT: run</span></footer>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

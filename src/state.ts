@@ -1,6 +1,6 @@
 import { createCreature, ITEMS, MOVES, SPECIES, evolutionAt, learnableMoveAt } from './data';
-import { calculateStats, expForLevel, expReward, SeededRng } from './rules';
-import type { CreatureInstance, GameOptions, GameSaveV1, InventoryStack, NewGameChoices } from './types';
+import { calculateStats, clamp, expForLevel, expReward, sanitizeEvs, SeededRng, ZERO_STATS } from './rules';
+import type { CreatureInstance, GameOptions, GameSaveV1, InventoryStack, NewGameChoices, Stats } from './types';
 
 const MANUAL = 'generation-league:manual:v1';
 const MANUAL_BACKUP = 'generation-league:manual:backup:v1';
@@ -27,9 +27,43 @@ export function decodeSave(raw: string | null): GameSaveV1 | null {
     const parsed = JSON.parse(raw) as SaveEnvelope;
     if (!parsed?.payload || parsed.payload.schemaVersion !== 1) return null;
     if (hash(JSON.stringify(parsed.payload)) !== parsed.checksum) return null;
-    if (!SPECIES[parsed.payload.party[0]?.speciesId] || parsed.payload.party.length > 6 || parsed.payload.storage.length > 120) return null;
-    return parsed.payload;
+    if (parsed.payload.party.length > 6 || parsed.payload.storage.length > 120) return null;
+    const party = parsed.payload.party.map((creature, index) => migrateCreature(creature, `party-${index}`));
+    const storage = parsed.payload.storage.map((creature, index) => migrateCreature(creature, `storage-${index}`));
+    if (!party.length) return null;
+    return { ...parsed.payload, migrationVersion: 2, party, storage };
   } catch { return null; }
+}
+
+function migrateCreature(input: CreatureInstance, fallbackId: string): CreatureInstance {
+  const raw = input as unknown as Partial<CreatureInstance>;
+  const species = SPECIES[raw.speciesId ?? ''];
+  if (!species) throw new Error(`Unknown species in save: ${raw.speciesId ?? 'missing'}`);
+  const level = clamp(Math.floor(raw.level ?? 1), 1, 100);
+  const ivs = { ...ZERO_STATS, ...(raw.ivs ?? {}) } as Stats;
+  (Object.keys(ivs) as Array<keyof Stats>).forEach((stat) => { ivs[stat] = clamp(Math.floor(ivs[stat] ?? 0), 0, 31); });
+  const evs = sanitizeEvs({ ...ZERO_STATS, ...(raw.evs ?? {}) } as Stats);
+  const moves = (raw.moves ?? []).filter((move) => Boolean(MOVES[move.moveId])).slice(0, 4).map((move) => {
+    const maxPp = Math.max(1, move.maxPp ?? MOVES[move.moveId].pp);
+    return { moveId: move.moveId, pp: clamp(Math.floor(move.pp ?? maxPp), 0, maxPp), maxPp };
+  });
+  const creature = {
+    ...raw,
+    uid: raw.uid ?? `${raw.speciesId}-${fallbackId}`,
+    speciesId: raw.speciesId,
+    level,
+    experience: Math.max(0, Math.floor(raw.experience ?? expForLevel(level, species.growthCurve))),
+    nature: raw.nature && raw.nature.length > 0 ? raw.nature : 'Hardy',
+    ability: raw.ability && species.abilities.includes(raw.ability) ? raw.ability : species.abilities[0],
+    gender: raw.gender ?? 'unknown', ivs, evs, calculatedStats: ZERO_STATS,
+    currentHp: 1, status: raw.status ?? null, sleepTurns: Math.max(0, Math.floor(raw.sleepTurns ?? 0)),
+    friendship: clamp(Math.floor(raw.friendship ?? species.baseHappiness), 0, 255), moves,
+    heldItem: raw.heldItem && ITEMS[raw.heldItem] ? raw.heldItem : null, nickname: raw.nickname ?? null,
+    capture: { mapId: raw.capture?.mapId ?? 'unknown', originalTrainer: raw.capture?.originalTrainer ?? 'Unknown', caughtAt: raw.capture?.caughtAt ?? 0, metLevel: raw.capture?.metLevel ?? level },
+  } as CreatureInstance;
+  creature.calculatedStats = calculateStats(creature, species);
+  creature.currentHp = clamp(Math.floor(raw.currentHp ?? creature.calculatedStats.hp), 0, creature.calculatedStats.hp);
+  return creature;
 }
 
 function loadOptions(): GameOptions {
@@ -55,7 +89,7 @@ export class GameStore {
   newGame(choices: NewGameChoices) {
     const starter = createCreature(choices.starter, 5, choices.name, 'research-lodge', this.rng);
     this.save = {
-      schemaVersion: 1, savedAt: Date.now(), player: { name: choices.name.slice(0, 10) || 'Aster', avatar: choices.avatar, crests: [] },
+      schemaVersion: 1, migrationVersion: 2, savedAt: Date.now(), player: { name: choices.name.slice(0, 10) || 'Aster', avatar: choices.avatar, crests: [] },
       location: { mapId: 'research-lodge', x: 7, y: 6, facing: 'up' }, party: [starter], storage: [], inventory: starterInventory(), money: 1200,
       guide: { seen: [choices.starter], caught: [choices.starter] }, storyFlags: ['starterChosen','tutorialReady'], defeatedTrainers: [], collectedItems: [],
       options: loadOptions(), playTimeSeconds: 0, startedAt: Date.now(), pendingEvolution: null,
@@ -121,9 +155,9 @@ export class GameStore {
   }
   setLocation(mapId: string, x: number, y: number) { if (this.save) this.save.location = { ...this.save.location, mapId, x, y }; }
   awardCrest(id: string) { if (this.save && !this.save.player.crests.includes(id)) { this.save.player.crests.push(id); this.addFlag(`crest:${id}`); } }
-  awardExperience(creature: CreatureInstance, defeatedSpeciesId: string, defeatedLevel: number, trainerBattle: boolean) {
+  awardExperience(creature: CreatureInstance, defeatedSpeciesId: string, defeatedLevel: number, participants = 1, trainerBattle = false) {
     const defeated = SPECIES[defeatedSpeciesId];
-    const amount = expReward(defeated, defeatedLevel, 1, trainerBattle);
+    const amount = expReward(defeated, defeatedLevel, participants, trainerBattle);
     creature.experience += amount;
     const messages = [`${creature.nickname || SPECIES[creature.speciesId].name} gained ${amount} EXP!`];
     while (creature.level < 100 && creature.experience >= expForLevel(creature.level + 1, SPECIES[creature.speciesId].growthCurve)) {
@@ -134,12 +168,13 @@ export class GameStore {
       messages.push(`${creature.nickname || SPECIES[creature.speciesId].name} grew to Lv.${creature.level}!`);
       const moveId = learnableMoveAt(creature.speciesId, creature.level);
       if (moveId) {
-        if (creature.moves.length < 4) { creature.moves.push({ moveId, pp: MOVES[moveId].pp }); messages.push(`It learned ${MOVES[moveId].name}!`); }
-        else { creature.moves.shift(); creature.moves.push({ moveId, pp: MOVES[moveId].pp }); messages.push(`It replaced its oldest move with ${MOVES[moveId].name}!`); }
+          if (creature.moves.length < 4) { creature.moves.push({ moveId, pp: MOVES[moveId].pp, maxPp: MOVES[moveId].pp }); messages.push(`It learned ${MOVES[moveId].name}!`); }
+          else { creature.moves.shift(); creature.moves.push({ moveId, pp: MOVES[moveId].pp, maxPp: MOVES[moveId].pp }); messages.push(`It replaced its oldest move with ${MOVES[moveId].name}!`); }
       }
       const next = evolutionAt(creature.speciesId, creature.level);
       if (next) { const oldName = SPECIES[creature.speciesId].name; creature.speciesId = next; this.see(next); if (!this.save!.guide.caught.includes(next)) this.save!.guide.caught.push(next); messages.push(`${oldName} evolved into ${SPECIES[next].name}!`); }
     }
+    creature.calculatedStats = calculateStats(creature, SPECIES[creature.speciesId]);
     return messages;
   }
 }

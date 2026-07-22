@@ -14,8 +14,9 @@ export class BootScene extends Phaser.Scene {
     this.load.on('progress',(value:number)=>{bar.width=174*value;status.setText(`PREPARING THE REGION… ${Math.floor(value*100)}%`);});
     this.load.setPath('/');
     Object.values(SPECIES).forEach((species) => {
-      this.load.image(`${species.id}-front`,`assets/creatures/optimized/${species.id}-front.png`);
-      this.load.image(`${species.id}-back`,`assets/creatures/optimized/${species.id}-back.png`);
+      const spriteRoot = species.spriteSheet.includes('/expansion/') ? 'assets/creatures/expansion/optimized' : 'assets/creatures/optimized';
+      this.load.image(`${species.id}-front`,`${spriteRoot}/${species.id}-front.png`);
+      this.load.image(`${species.id}-back`,`${spriteRoot}/${species.id}-back.png`);
     });
     this.load.spritesheet('avatar-a','assets/ninja-adventure/characters/avatar-a.png',{frameWidth:16,frameHeight:16});
     this.load.spritesheet('avatar-b','assets/ninja-adventure/characters/avatar-b.png',{frameWidth:16,frameHeight:16});

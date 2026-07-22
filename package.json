@@ -7,7 +7,8 @@
     "dev": "vite --host 127.0.0.1",
     "start": "vite --host 127.0.0.1",
     "build": "tsc -b && vite build",
-    "check": "tsc -b --pretty false && vitest run",
+    "assets:validate": "node scripts/validate-creature-assets.mjs",
+    "check": "npm run assets:validate && tsc -b --pretty false && vitest run",
     "test": "vitest run",
     "preview": "vite preview --host 127.0.0.1"
   },

@@ -22,7 +22,7 @@ export class BattleScene extends Phaser.Scene {
     this.locked=true;this.mode='locked';this.cursor=0;this.rewarded.clear();this.uiObjects=[];
     if(!gameStore.save){this.scene.start('Title');return;}
     const enemyParty=this.initData.kind==='wild'?[this.initData.wild!]:this.trainer!.party.map((entry)=>createCreature(entry.speciesId,entry.level,this.trainer!.name,this.initData.mapId,gameStore.rng));
-    this.context={player:{party:gameStore.save.party,active:Math.max(0,gameStore.save.party.findIndex((c)=>c.currentHp>0)),stages:{...BASE_STAGES},protected:false},enemy:{party:enemyParty,active:0,stages:{...BASE_STAGES},protected:false},kind:this.initData.kind,field:{effect:null,turns:0},turn:0,ended:false,winner:null};
+    this.context={player:{party:gameStore.save.party,active:Math.max(0,gameStore.save.party.findIndex((c)=>c.currentHp>0)),stages:{...BASE_STAGES},protected:false,participants:[],protectStreak:0},enemy:{party:enemyParty,active:0,stages:{...BASE_STAGES},protected:false,participants:[],protectStreak:0},kind:this.initData.kind,field:{effect:null,turns:0},turn:0,ended:false,winner:null};
     document.body.dataset.gameScene='battle';document.body.dataset.battleMode='locked';document.body.dataset.battleLocked='true';
     enemyParty.forEach((c)=>gameStore.see(c.speciesId));
     this.renderArena();this.renderCombatants();this.renderStatus();this.renderDialogue();controls.clear();
@@ -131,7 +131,8 @@ export class BattleScene extends Phaser.Scene {
     if(event.kind==='text'&&event.text){this.showText(event.text);await this.wait(600);}
   }
   private async afterTurn(){
-    for(const enemy of this.context.enemy.party){if(enemy.currentHp<=0&&!this.rewarded.has(enemy.uid)){this.rewarded.add(enemy.uid);const messages=gameStore.awardExperience(this.player(),enemy.speciesId,enemy.level,this.context.kind==='trainer');for(const message of messages){this.showText(message);await this.wait(750);}}}
+    const participantIds=new Set(this.context.player.participants??[]);const participants=this.context.player.party.filter((creature)=>participantIds.has(creature.uid));
+    for(const enemy of this.context.enemy.party){if(enemy.currentHp<=0&&!this.rewarded.has(enemy.uid)){this.rewarded.add(enemy.uid);for(const participant of participants){const messages=gameStore.awardExperience(participant,enemy.speciesId,enemy.level,participants.length,this.context.kind==='trainer');for(const message of messages){this.showText(message);await this.wait(750);}}}}
     if(this.context.ended){if(this.context.winner==='player')await this.victory();else await this.defeat();return;}
     if(this.enemy().currentHp<=0){const next=this.context.enemy.party.findIndex((c)=>c.currentHp>0);if(next>=0){this.context.enemy.active=next;this.context.enemy.stages={...BASE_STAGES};this.swapSprite('enemy');this.showText(`${this.trainer?.name??'The foe'} sent out ${this.enemySpecies().name}!`);await this.wait(850);}}
     if(this.player().currentHp<=0){const next=this.context.player.party.findIndex((c)=>c.currentHp>0);if(next>=0){this.mode='party';this.cursor=next;this.locked=false;this.showText('Choose a creature to continue.');this.renderMenu();return;}}

@@ -3,6 +3,39 @@ import { calculateStats, expForLevel, NATURES, SeededRng, ZERO_STATS } from './r
 
 const S = (hp: number, attack: number, defense: number, spAttack: number, spDefense: number, speed: number): Stats => ({ hp, attack, defense, spAttack, spDefense, speed });
 
+const CREATURE_META: Record<string, { regionalNumber: number; category: string; description: string; habitat: string; height: number; weight: number; baseHappiness: number }> = {
+  cragbud: { regionalNumber: 1, category: 'Sprout Stone', description: 'A young stone-backed sprout that stores sunlight in its moss.', habitat: 'Verdant Path', height: .4, weight: 6.2, baseHappiness: 70 },
+  mossolith: { regionalNumber: 2, category: 'Moss Rock', description: 'Its layered shell gathers dew and protects a growing root heart.', habitat: 'Glimmerwood', height: .9, weight: 38.5, baseHappiness: 70 },
+  glimmoss: { regionalNumber: 3, category: 'Grove Warden', description: 'Ancient moss blooms across its stone armor when it calls the wind.', habitat: 'Glimmerwood', height: 1.7, weight: 112.4, baseHappiness: 70 },
+  cinderskink: { regionalNumber: 4, category: 'Ember Skink', description: 'A quick little skink that warms its tail by swallowing hot cinders.', habitat: 'Cinderstep', height: .5, weight: 7.1, baseHappiness: 70 },
+  pyrograith: { regionalNumber: 5, category: 'Ash Runner', description: 'Its smoke mantle keeps its body cool while its inner flame accelerates.', habitat: 'Ashfall Grotto', height: 1.1, weight: 24.8, baseHappiness: 70 },
+  pyrovanth: { regionalNumber: 6, category: 'Ridge Flame', description: 'A storm of fire follows every wingbeat from its blazing ridge crest.', habitat: 'Ember Ridge', height: 1.8, weight: 69.3, baseHappiness: 70 },
+  jellume: { regionalNumber: 7, category: 'Glow Jelly', description: 'Its soft body shines brighter when it senses a friendly heartbeat.', habitat: 'Reedwater Crossing', height: .6, weight: 4.4, baseHappiness: 70 },
+  prismedusa: { regionalNumber: 8, category: 'Prism Jelly', description: 'Crystalline fins split incoming light into protective color bands.', habitat: 'Reedwater Crossing', height: 1.2, weight: 18.6, baseHappiness: 70 },
+  abyssara: { regionalNumber: 9, category: 'Deep Prism', description: 'Its abyssal glow can be seen through the deepest Tideglass channels.', habitat: 'Tideglass City', height: 2.1, weight: 88.7, baseHappiness: 70 },
+  gildig: { regionalNumber: 10, category: 'Ore Digger', description: 'It can smell a useful mineral beneath a trail before anyone else can.', habitat: 'Verdant Path', height: .5, weight: 12.3, baseHappiness: 70 },
+  oreclaw: { regionalNumber: 11, category: 'Ore Badger', description: 'Its reinforced claws tunnel through soft rock in search of bright seams.', habitat: 'Ashfall Grotto', height: 1.0, weight: 42.1, baseHappiness: 70 },
+  auradger: { regionalNumber: 12, category: 'Aura Badger', description: 'Rare metal dust around its claws flashes in rhythm with its focused aura.', habitat: 'Ashfall Grotto', height: 1.5, weight: 86.9, baseHappiness: 70 },
+  reedroll: { regionalNumber: 13, category: 'Reed Runner', description: 'It rolls through reeds so lightly that only a breeze gives it away.', habitat: 'Reedwater Crossing', height: .3, weight: 3.8, baseHappiness: 70 },
+  wickerwhorl: { regionalNumber: 14, category: 'Woven Runner', description: 'Its woven body catches wind and turns every slope into a racetrack.', habitat: 'Reedwater Crossing', height: .8, weight: 11.6, baseHappiness: 70 },
+  bramblecoil: { regionalNumber: 15, category: 'Bramble Runner', description: 'A living coil of reed and thorn that guards the quiet edges of the region.', habitat: 'Ember Ridge', height: 1.4, weight: 38.2, baseHappiness: 70 },
+  spriglet: { regionalNumber: 16, category: 'Seedling', description: 'Its spiral seed mark warms in sunlight, helping it find the safest patch of soil.', habitat: 'Verdant Path', height: .3, weight: 4.1, baseHappiness: 70 },
+  rootusk: { regionalNumber: 17, category: 'Root Grove', description: 'It grows a leafy mantle by sleeping with its paws tucked into soft earth.', habitat: 'Glimmerwood', height: .8, weight: 24.4, baseHappiness: 70 },
+  canopaw: { regionalNumber: 18, category: 'Canopy', description: 'Its broad leaf canopy shelters smaller creatures during sudden woodland rain.', habitat: 'Glimmerwood', height: 1.5, weight: 78.2, baseHappiness: 70 },
+  sootsqueak: { regionalNumber: 19, category: 'Coal Mouse', description: 'A warm ember in its cheek glows brighter whenever it is excited.', habitat: 'Cinderstep Town', height: .25, weight: 3.6, baseHappiness: 70 },
+  kilnibble: { regionalNumber: 20, category: 'Kiln Mouse', description: 'Its back vents release tiny puffs of heat that keep it comfortable in cold caves.', habitat: 'Ashfall Grotto', height: .65, weight: 16.8, baseHappiness: 70 },
+  hearthare: { regionalNumber: 21, category: 'Hearth Runner', description: 'It races along warm stone and leaves a gentle trail of heat behind its paws.', habitat: 'Ember Ridge', height: 1.2, weight: 48.5, baseHappiness: 70 },
+  drizzlet: { regionalNumber: 22, category: 'Drop', description: 'It gathers in a small ripple when it hears rain approaching.', habitat: 'Reedwater Crossing', height: .35, weight: 2.8, baseHappiness: 70 },
+  puddlefin: { regionalNumber: 23, category: 'Ripple', description: 'Its ring of fins lets it hover just above the surface of calm water.', habitat: 'Reedwater Crossing', height: .8, weight: 12.6, baseHappiness: 70 },
+  rainquill: { regionalNumber: 24, category: 'Rain Current', description: 'The ribbons around its body trace the direction of distant storms.', habitat: 'Tideglass City', height: 1.6, weight: 52.2, baseHappiness: 70 },
+  breezlet: { regionalNumber: 25, category: 'Puff', description: 'It rides warm air currents and collects light seeds in its curled tail.', habitat: 'Verdant Path', height: .3, weight: 2.2, baseHappiness: 70 },
+  whifflit: { regionalNumber: 26, category: 'Fan Puff', description: 'Its broad fins let it hover in place even when the weather suddenly changes.', habitat: 'Ember Ridge', height: .7, weight: 8.4, baseHappiness: 70 },
+  galegale: { regionalNumber: 27, category: 'Sail Puff', description: 'It can carry a gentle breeze across an entire valley with one sweeping turn.', habitat: 'Ember Ridge', height: 1.4, weight: 34.7, baseHappiness: 70 },
+  tangletoad: { regionalNumber: 28, category: 'Marsh Bloom', description: 'The flower on its head opens whenever it finds clean water.', habitat: 'Reedwater Crossing', height: .35, weight: 5.2, baseHappiness: 70 },
+  bogloom: { regionalNumber: 29, category: 'Pond Bloom', description: 'It stores cool droplets on its petals to stay comfortable through dry days.', habitat: 'Reedwater Crossing', height: .8, weight: 20.5, baseHappiness: 70 },
+  mirebloom: { regionalNumber: 30, category: 'Wetland Bloom', description: 'Its reed-frill shelters young marsh creatures from strong currents and wind.', habitat: 'Tideglass City', height: 1.4, weight: 68.9, baseHappiness: 70 },
+};
+
 export const MOVES: Record<string, MoveDefinition> = {
   nudge: { id: 'nudge', name: 'Nudge', type: 'Neutral', power: 40, accuracy: 100, pp: 35, priority: 0, target: 'foe', category: 'Physical', effect: 'damage', animation: 'impact', audioCue: 'thud', description: 'A reliable body check.' },
   quickstep: { id: 'quickstep', name: 'Quickstep', type: 'Wind', power: 40, accuracy: 100, pp: 30, priority: 1, target: 'foe', category: 'Physical', effect: 'priority', animation: 'slash', audioCue: 'slice', description: 'A darting strike that acts first.' },
@@ -45,9 +78,15 @@ export const MOVES: Record<string, MoveDefinition> = {
   bramblewheel: { id: 'bramblewheel', name: 'Bramble Wheel', type: 'Verdant', power: 90, accuracy: 90, pp: 10, priority: 0, target: 'foe', category: 'Physical', effect: 'recoil', ratio: 0.2, animation: 'bramble-wheel', audioCue: 'leaf-heavy', description: 'A thorned wheel crashes into the foe.' },
 };
 
-const line = (id: string, name: string, lineName: string, stage: 1 | 2 | 3, types: SpeciesDefinition['types'], baseStats: Stats, growthCurve: SpeciesDefinition['growthCurve'], captureRate: number, baseExp: number, abilities: string[], learnset: Array<[number, string]>, spriteUrl: string, evolution?: SpeciesDefinition['evolution']): SpeciesDefinition => ({
-  id, name, line: lineName, stage, types, baseStats, growthCurve, captureRate, baseExp, evYield: stage === 1 ? { hp: 1 } : stage === 2 ? { defense: 2 } : { attack: 2, hp: 1 }, abilities, learnset, evolution, spriteKey: id, spriteUrl,
-});
+const line = (id: string, name: string, lineName: string, stage: 1 | 2 | 3, types: SpeciesDefinition['types'], baseStats: Stats, growthCurve: SpeciesDefinition['growthCurve'], captureRate: number, baseExp: number, abilities: string[], learnset: Array<[number, string]>, spriteUrl: string, evolution?: SpeciesDefinition['evolution'], assetRoot = A): SpeciesDefinition => {
+  const meta = CREATURE_META[id];
+  return {
+    id, regionalNumber: meta.regionalNumber, name, line: lineName, stage, category: meta.category, description: meta.description, habitat: meta.habitat,
+    height: meta.height, weight: meta.weight, baseHappiness: meta.baseHappiness, types, baseStats, growthCurve, captureRate, baseExp,
+    evYield: stage === 1 ? { hp: 1 } : stage === 2 ? { defense: 2 } : { attack: 2, hp: 1 }, abilities, learnset, evolution, spriteKey: id, spriteUrl,
+    spriteSheet: `${assetRoot}/sheets/${id}-battle-sheet.png`, animationKeys: ['idle','attack','hit','faint','status','select'],
+  };
+};
 
 const A = '/assets/creatures';
 export const SPECIES: Record<string, SpeciesDefinition> = {
@@ -70,6 +109,26 @@ export const SPECIES: Record<string, SpeciesDefinition> = {
   reedroll: line('reedroll', 'Reedroll', 'Bramblecoil', 1, ['Verdant','Wind'], S(46, 50, 48, 35, 45, 62), 'fast', 200, 59, ['Windweave', 'Thornhide'], [[1,'nudge'],[4,'reedwhip'],[8,'quickstep'],[12,'rollrush'],[16,'wickertrap']], `${A}/reedroll/reedroll-stage-1.png`, { level: 18, speciesId: 'wickerwhorl' }),
   wickerwhorl: line('wickerwhorl', 'Wickerwhorl', 'Bramblecoil', 2, ['Verdant','Wind'], S(66, 72, 68, 48, 62, 88), 'fast', 100, 130, ['Windweave', 'Thornhide'], [[1,'reedwhip'],[8,'quickstep'],[12,'rollrush'],[18,'wickertrap'],[24,'tailwind']], `${A}/reedroll/reedroll-stage-2.png`, { level: 32, speciesId: 'bramblecoil' }),
   bramblecoil: line('bramblecoil', 'Bramblecoil', 'Bramblecoil', 3, ['Verdant','Wind'], S(86, 104, 92, 64, 84, 118), 'fast', 55, 216, ['Windweave', 'Thornhide'], [[1,'reedwhip'],[12,'rollrush'],[18,'wickertrap'],[24,'tailwind'],[32,'bramblewheel']], `${A}/reedroll/reedroll-stage-3.png`),
+
+  spriglet: line('spriglet', 'Spriglet', 'Canopaw', 1, ['Verdant'], S(46, 48, 50, 34, 44, 42), 'medium', 180, 60, ['Rootwake', 'Windweave'], [[1,'nudge'],[4,'leaflick'],[8,'harden'],[12,'vinebind']], `${A}/expansion/optimized/spriglet-front.png`, { level: 16, speciesId: 'rootusk' }, `${A}/expansion`),
+  rootusk: line('rootusk', 'Rootusk', 'Canopaw', 2, ['Verdant'], S(68, 74, 78, 48, 64, 50), 'medium', 90, 130, ['Rootwake', 'Windweave'], [[1,'leaflick'],[8,'harden'],[12,'vinebind'],[18,'rootdraw'],[24,'verdantmend']], `${A}/expansion/optimized/rootusk-front.png`, { level: 36, speciesId: 'canopaw' }, `${A}/expansion`),
+  canopaw: line('canopaw', 'Canopaw', 'Canopaw', 3, ['Verdant','Wind'], S(96, 106, 104, 70, 92, 68), 'medium', 45, 220, ['Rootwake', 'Windweave'], [[1,'leaflick'],[12,'rootdraw'],[18,'briarstorm'],[24,'verdantmend'],[36,'greencrown']], `${A}/expansion/optimized/canopaw-front.png`, undefined, `${A}/expansion`),
+
+  sootsqueak: line('sootsqueak', 'Sootsqueak', 'Hearthare', 1, ['Ember'], S(40, 42, 36, 54, 42, 58), 'medium', 180, 61, ['Flashkindle', 'Shedskin'], [[1,'nudge'],[4,'embernip'],[8,'quickstep'],[12,'smokeshroud']], `${A}/expansion/optimized/sootsqueak-front.png`, { level: 16, speciesId: 'kilnibble' }, `${A}/expansion`),
+  kilnibble: line('kilnibble', 'Kilnibble', 'Hearthare', 2, ['Ember'], S(62, 64, 52, 78, 58, 78), 'medium', 90, 132, ['Flashkindle', 'Shedskin'], [[1,'embernip'],[8,'quickstep'],[12,'smokeshroud'],[18,'cinderspit'],[24,'flarecoil']], `${A}/expansion/optimized/kilnibble-front.png`, { level: 36, speciesId: 'hearthare' }, `${A}/expansion`),
+  hearthare: line('hearthare', 'Hearthare', 'Hearthare', 3, ['Ember','Wind'], S(82, 94, 68, 108, 80, 108), 'medium', 45, 224, ['Flashkindle', 'Shedskin'], [[1,'embernip'],[12,'cinderspit'],[18,'flarecoil'],[24,'cinderfall'],[36,'pyrehowl']], `${A}/expansion/optimized/hearthare-front.png`, undefined, `${A}/expansion`),
+
+  drizzlet: line('drizzlet', 'Drizzlet', 'Rainquill', 1, ['Tide'], S(50, 30, 42, 56, 62, 40), 'slow', 180, 62, ['Clearbody', 'Tidewell'], [[1,'nudge'],[4,'bubblepop'],[8,'focus'],[12,'ebbguard']], `${A}/expansion/optimized/drizzlet-front.png`, { level: 16, speciesId: 'puddlefin' }, `${A}/expansion`),
+  puddlefin: line('puddlefin', 'Puddlefin', 'Rainquill', 2, ['Tide'], S(70, 42, 60, 82, 86, 54), 'slow', 90, 134, ['Clearbody', 'Tidewell'], [[1,'bubblepop'],[8,'focus'],[12,'ebbguard'],[18,'prismsting'],[24,'undertow']], `${A}/expansion/optimized/puddlefin-front.png`, { level: 36, speciesId: 'rainquill' }, `${A}/expansion`),
+  rainquill: line('rainquill', 'Rainquill', 'Rainquill', 3, ['Tide','Wind'], S(100, 58, 78, 112, 118, 78), 'slow', 45, 228, ['Clearbody', 'Tidewell'], [[1,'bubblepop'],[12,'prismsting'],[18,'undertow'],[24,'cleansingrain'],[36,'abyssalbeam']], `${A}/expansion/optimized/rainquill-front.png`, undefined, `${A}/expansion`),
+
+  breezlet: line('breezlet', 'Breezlet', 'Galegale', 1, ['Wind'], S(42, 38, 38, 46, 50, 66), 'fast', 200, 59, ['Windweave', 'Clearbody'], [[1,'nudge'],[4,'quickstep'],[8,'sandhush'],[12,'tailwind']], `${A}/expansion/optimized/breezlet-front.png`, { level: 18, speciesId: 'whifflit' }, `${A}/expansion`),
+  whifflit: line('whifflit', 'Whifflit', 'Galegale', 2, ['Wind'], S(64, 56, 54, 70, 70, 94), 'fast', 100, 130, ['Windweave', 'Clearbody'], [[1,'quickstep'],[8,'sandhush'],[12,'tailwind'],[18,'goldrush'],[24,'undertow']], `${A}/expansion/optimized/whifflit-front.png`, { level: 32, speciesId: 'galegale' }, `${A}/expansion`),
+  galegale: line('galegale', 'Galegale', 'Galegale', 3, ['Wind','Tide'], S(86, 76, 72, 98, 92, 124), 'fast', 55, 218, ['Windweave', 'Clearbody'], [[1,'quickstep'],[12,'tailwind'],[18,'goldrush'],[24,'undertow'],[32,'tunnelburst']], `${A}/expansion/optimized/galegale-front.png`, undefined, `${A}/expansion`),
+
+  tangletoad: line('tangletoad', 'Tangletoad', 'Mirebloom', 1, ['Verdant','Tide'], S(54, 48, 54, 42, 52, 34), 'slow', 200, 60, ['Tidewell', 'Thornhide'], [[1,'nudge'],[4,'bubblepop'],[8,'leaflick'],[12,'wickertrap']], `${A}/expansion/optimized/tangletoad-front.png`, { level: 18, speciesId: 'bogloom' }, `${A}/expansion`),
+  bogloom: line('bogloom', 'Bogloom', 'Mirebloom', 2, ['Verdant','Tide'], S(76, 68, 72, 58, 74, 42), 'slow', 100, 132, ['Tidewell', 'Thornhide'], [[1,'bubblepop'],[8,'leaflick'],[12,'wickertrap'],[18,'vinebind'],[24,'cleansingrain']], `${A}/expansion/optimized/bogloom-front.png`, { level: 32, speciesId: 'mirebloom' }, `${A}/expansion`),
+  mirebloom: line('mirebloom', 'Mirebloom', 'Mirebloom', 3, ['Verdant','Tide'], S(104, 98, 100, 78, 106, 56), 'slow', 55, 220, ['Tidewell', 'Thornhide'], [[1,'bubblepop'],[12,'vinebind'],[18,'wickertrap'],[24,'cleansingrain'],[32,'bramblewheel']], `${A}/expansion/optimized/mirebloom-front.png`, undefined, `${A}/expansion`),
 };
 
 export const ITEMS: Record<string, ItemDefinition> = {
@@ -94,11 +153,12 @@ export function createCreature(speciesId: string, level: number, trainer: string
   const creature: CreatureInstance = {
     uid: `${speciesId}-${Date.now().toString(36)}-${rng.int(1000,9999)}`,
     speciesId, level, experience: expForLevel(level, definition.growthCurve), nature: NATURES[rng.int(0, NATURES.length - 1)],
-    ability: definition.abilities[rng.int(0, definition.abilities.length - 1)], ivs: randomStats(), evs: { ...ZERO_STATS }, currentHp: 1,
-    status: null, sleepTurns: 0, moves: knownIds.map((moveId) => ({ moveId, pp: MOVES[moveId].pp })), heldItem: null, nickname: null,
-    capture: { mapId, originalTrainer: trainer, caughtAt: Date.now() },
+    ability: definition.abilities[rng.int(0, definition.abilities.length - 1)], gender: 'unknown', ivs: randomStats(), evs: { ...ZERO_STATS },
+    calculatedStats: { ...ZERO_STATS }, currentHp: 1, status: null, sleepTurns: 0, friendship: definition.baseHappiness,
+    moves: knownIds.map((moveId) => ({ moveId, pp: MOVES[moveId].pp, maxPp: MOVES[moveId].pp })), heldItem: null, nickname: null,
+    capture: { mapId, originalTrainer: trainer, caughtAt: Date.now(), metLevel: level },
   };
-  creature.currentHp = calculateStats(creature, definition).hp;
+  creature.calculatedStats = calculateStats(creature, definition); creature.currentHp = creature.calculatedStats.hp;
   return creature;
 }
 
@@ -107,4 +167,5 @@ export function evolutionAt(speciesId: string, level: number) { const evolution 
 
 export const REGIONAL_GUIDE = [
   'cragbud','mossolith','glimmoss','cinderskink','pyrograith','pyrovanth','jellume','prismedusa','abyssara','gildig','oreclaw','auradger','reedroll','wickerwhorl','bramblecoil',
+  'spriglet','rootusk','canopaw','sootsqueak','kilnibble','hearthare','drizzlet','puddlefin','rainquill','breezlet','whifflit','galegale','tangletoad','bogloom','mirebloom',
 ];

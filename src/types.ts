@@ -18,9 +18,16 @@ export interface EvolutionRule { level: number; speciesId: string }
 
 export interface SpeciesDefinition {
   id: string;
+  regionalNumber: number;
   name: string;
   line: string;
   stage: 1 | 2 | 3;
+  category: string;
+  description: string;
+  habitat: string;
+  height: number;
+  weight: number;
+  baseHappiness: number;
   types: [ElementType, ElementType?];
   baseStats: Stats;
   growthCurve: GrowthCurve;
@@ -28,10 +35,13 @@ export interface SpeciesDefinition {
   baseExp: number;
   evYield: Partial<Stats>;
   abilities: string[];
+  hiddenAbility?: string;
   learnset: Array<[number, string]>;
   evolution?: EvolutionRule;
   spriteKey: string;
   spriteUrl: string;
+  spriteSheet: string;
+  animationKeys: string[];
 }
 
 export type MoveEffect =
@@ -63,9 +73,9 @@ export interface MoveDefinition {
   description: string;
 }
 
-export interface KnownMove { moveId: string; pp: number }
+export interface KnownMove { moveId: string; pp: number; maxPp: number }
 
-export interface CaptureMetadata { mapId: string; originalTrainer: string; caughtAt: number }
+export interface CaptureMetadata { mapId: string; originalTrainer: string; caughtAt: number; metLevel: number }
 
 export interface CreatureInstance {
   uid: string;
@@ -74,11 +84,14 @@ export interface CreatureInstance {
   experience: number;
   nature: string;
   ability: string;
+  gender: 'male' | 'female' | 'unknown';
   ivs: Stats;
   evs: Stats;
+  calculatedStats: Stats;
   currentHp: number;
   status: MajorStatus;
   sleepTurns: number;
+  friendship: number;
   moves: KnownMove[];
   heldItem: string | null;
   nickname: string | null;
@@ -100,6 +113,8 @@ export interface BattleSide {
   active: number;
   stages: StatStages;
   protected: boolean;
+  participants?: string[];
+  protectStreak?: number;
 }
 
 export type BattleAction =
@@ -175,6 +190,7 @@ export interface MapDefinition {
 export interface GameOptions { musicVolume: number; sfxVolume: number; muted: boolean; textSpeed: 'slow' | 'normal' | 'fast' }
 export interface GameSaveV1 {
   schemaVersion: 1;
+  migrationVersion?: number;
   savedAt: number;
   player: { name: string; avatar: 'a' | 'b'; crests: string[] };
   location: { mapId: string; x: number; y: number; facing: Direction };

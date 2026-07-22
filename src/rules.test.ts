@@ -13,8 +13,8 @@ const contextFor = (playerId='cragbud',enemyId='jellume'):BattleContext => ({
 });
 
 describe('campaign data',()=>{
-  it('defines exactly the approved fifteen-species guide and valid references',()=>{
-    expect(REGIONAL_GUIDE).toHaveLength(15);expect(new Set(REGIONAL_GUIDE).size).toBe(15);
+  it('defines the original fifteen-species guide plus the fifteen-species expansion and valid references',()=>{
+    expect(REGIONAL_GUIDE).toHaveLength(30);expect(new Set(REGIONAL_GUIDE).size).toBe(30);
     for(const species of Object.values(SPECIES)){
       expect(species.learnset.length).toBeGreaterThanOrEqual(4);
       species.learnset.forEach(([,moveId])=>expect(MOVES[moveId],`${species.id}/${moveId}`).toBeTruthy());
@@ -61,26 +61,26 @@ describe('generation-style progression rules',()=>{
     expect(low.effectiveness).toBe(2);expect(high.damage).toBeGreaterThan(low.damage);
   });
   it('resolves priority, PP, damage, status and end-of-turn timing through one engine',()=>{
-    const battle=contextFor('cragbud','jellume');battle.player.party[0].moves=[{moveId:'quickstep',pp:5}];battle.enemy.party[0].moves=[{moveId:'prismsting',pp:5}];
+    const battle=contextFor('cragbud','jellume');battle.player.party[0].moves=[{moveId:'quickstep',pp:5,maxPp:5}];battle.enemy.party[0].moves=[{moveId:'prismsting',pp:5,maxPp:5}];
     const events=resolveTurn(battle,{kind:'move',moveIndex:0},{kind:'move',moveIndex:0},SPECIES,MOVES,fixedRng(.01));
     expect(events.find((event)=>event.kind==='move')?.side).toBe('player');expect(battle.player.party[0].moves[0].pp).toBe(4);expect(battle.enemy.party[0].currentHp).toBeLessThan(calculateStats(battle.enemy.party[0],SPECIES.jellume).hp);
   });
   it('replaces a fainted player creature without granting the enemy another attack',()=>{
-    const battle=contextFor('cragbud','jellume'),replacement=createCreature('cinderskink',20,'Test','test',new SeededRng(8));battle.player.party.push(replacement);battle.player.party[0].currentHp=0;battle.enemy.party[0].moves=[{moveId:'prismsting',pp:5}];battle.field={effect:'monsoon',turns:3};
+    const battle=contextFor('cragbud','jellume'),replacement=createCreature('cinderskink',20,'Test','test',new SeededRng(8));battle.player.party.push(replacement);battle.player.party[0].currentHp=0;battle.enemy.party[0].moves=[{moveId:'prismsting',pp:5,maxPp:5}];battle.field={effect:'monsoon',turns:3};
     const hp=replacement.currentHp,events=resolveTurn(battle,{kind:'switch',partyIndex:1},{kind:'move',moveIndex:0},SPECIES,MOVES,fixedRng(.01));
     expect(events.map((event)=>event.kind)).toEqual(['switch']);expect(battle.player.active).toBe(1);expect(replacement.currentHp).toBe(hp);expect(battle.enemy.party[0].moves[0].pp).toBe(5);expect(battle.turn).toBe(0);expect(battle.field.turns).toBe(3);
   });
   it('supports healing, recoil, drain, multi-hit, stat stages and field effects',()=>{
     const effects=['heal','recoil','drain','multiHit','raise','lower','weather'];
     effects.forEach((effect)=>expect(Object.values(MOVES).some((move)=>move.effect===effect),effect).toBe(true));
-    const battle=contextFor();battle.player.party[0].moves=[{moveId:'tailwind',pp:2}];resolveTurn(battle,{kind:'move',moveIndex:0},{kind:'switch',partyIndex:0},SPECIES,MOVES,fixedRng(.2));expect(battle.field.effect).toBe('tailwind');expect(battle.field.turns).toBe(4);
+    const battle=contextFor();battle.player.party[0].moves=[{moveId:'tailwind',pp:2,maxPp:2}];resolveTurn(battle,{kind:'move',moveIndex:0},{kind:'switch',partyIndex:0},SPECIES,MOVES,fixedRng(.2));expect(battle.field.effect).toBe('tailwind');expect(battle.field.turns).toBe(4);
   });
   it('uses HP, status, capture rate and item modifier for capture probability',()=>{
     const creature=createCreature('gildig',8,'Wild','route',new SeededRng(7)),max=calculateStats(creature,SPECIES.gildig).hp;creature.currentHp=1;creature.status='sleep';
     expect(captureChance(creature,SPECIES.gildig,max,1.5,fixedRng(.01))).toBe(true);expect(captureChance(creature,SPECIES.gildig,max,1,fixedRng(.99))).toBe(false);
   });
   it('trainer AI evaluates available damage and does not choose exhausted moves',()=>{
-    const battle=contextFor('cragbud','cinderskink');battle.enemy.party[0].moves=[{moveId:'embernip',pp:0},{moveId:'cinderspit',pp:10},{moveId:'smokeshroud',pp:10}];
+    const battle=contextFor('cragbud','cinderskink');battle.enemy.party[0].moves=[{moveId:'embernip',pp:0,maxPp:25},{moveId:'cinderspit',pp:10,maxPp:20},{moveId:'smokeshroud',pp:10,maxPp:20}];
     const action=chooseTrainerAction(battle,SPECIES,MOVES,fixedRng(.5));expect(action.kind).toBe('move');if(action.kind==='move')expect(action.moveIndex).not.toBe(0);
   });
 });

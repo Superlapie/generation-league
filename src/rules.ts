@@ -109,9 +109,11 @@ export function damageRoll(
   const heldBoost = attacker.heldItem === 'emberCharm' && move.type === 'Ember' ? 1.12 : 1;
   const guard = (defender.ability === 'Stoneheart' && move.type === 'Neutral') || (defender.ability === 'Gritcoat' && move.type === 'Wind') ? .75 : 1;
   const fieldBoost = field === 'cinderfall' ? (move.type === 'Ember' ? 1.25 : move.type === 'Tide' ? .8 : 1) : field === 'monsoon' ? (move.type === 'Tide' ? 1.25 : move.type === 'Ember' ? .8 : 1) : field === 'tailwind' && move.type === 'Wind' ? 1.15 : 1;
-  const random = 0.85 + rng.next() * 0.15;
+  const random = 217 + Math.floor(rng.next() * 39);
   const base = Math.floor(Math.floor(Math.floor((2 * attacker.level / 5 + 2) * move.power * attack / Math.max(1, defense)) / 50) + 2);
-  return { damage: Math.max(1, Math.floor(base * stab * effectiveness * burn * abilityBoost * heldBoost * guard * fieldBoost * random * (critical ? 2 : 1))), effectiveness, critical };
+  const modifier = stab * effectiveness * burn * abilityBoost * heldBoost * guard * fieldBoost * (critical ? 2 : 1);
+  const damage = Math.floor((base * modifier * random) / 255);
+  return { damage: effectiveness === 0 ? 0 : Math.max(1, damage), effectiveness, critical };
 }
 
 export function expForLevel(level: number, curve: SpeciesDefinition['growthCurve']) {
@@ -227,6 +229,7 @@ export function resolveTurn(
     const target = active(turn.foe);
     const targetSpecies = species[target.speciesId];
     const targetName = displayName(target, targetSpecies);
+    if (turn.action.kind === 'move' && turn.side.participants && !turn.side.participants.includes(actor.uid)) turn.side.participants.push(actor.uid);
     if (turn.action.kind === 'switch') {
       const next = turn.side.party[turn.action.partyIndex];
       if (next && alive(next) && turn.action.partyIndex !== turn.side.active) {
@@ -236,6 +239,7 @@ export function resolveTurn(
       continue;
     }
     if (turn.action.kind !== 'move') continue;
+    if (turn.action.moveIndex < 0 || turn.action.moveIndex >= actor.moves.length) continue;
     if (!canAct(actor, actorName, turn.name, rng, events)) continue;
     const known = actor.moves[turn.action.moveIndex];
     const move = known && moves[known.moveId];
@@ -243,7 +247,13 @@ export function resolveTurn(
     known.pp -= 1;
     events.push({ kind: 'move', side: turn.name, moveId: move.id, text: `${actorName} used ${move.name}!` });
     if (!accuracyCheck(move, turn.side, turn.foe, rng)) { events.push({ kind: 'miss', side: turn.name, text: 'But it missed!' }); continue; }
-    if (move.effect === 'protect') { turn.side.protected = true; events.push({ kind: 'status', side: turn.name, text: `${actorName} braced behind a shining guard!` }); continue; }
+    if (move.effect === 'protect') {
+      const streak = turn.side.protectStreak ?? 0; const success = streak === 0 || rng.next() < 1 / (2 ** streak);
+      if (success) { turn.side.protected = true; turn.side.protectStreak = streak + 1; events.push({ kind: 'status', side: turn.name, text: `${actorName} braced behind a shining guard!` }); }
+      else { turn.side.protectStreak = 0; events.push({ kind: 'text', side: turn.name, text: `${actorName}'s guard failed!` }); }
+      continue;
+    }
+    turn.side.protectStreak = 0;
     if (turn.foe.protected && move.target === 'foe') { events.push({ kind: 'text', side: turn.foeName, text: `${targetName} protected itself!` }); continue; }
     if (move.effect === 'heal' || move.effect === 'cleanse') {
       if (move.effect === 'cleanse') { actor.status = null; events.push({ kind: 'status', side: turn.name, text: `${actorName} was cleansed!` }); }

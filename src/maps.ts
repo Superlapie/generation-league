@@ -14,7 +14,7 @@ function tileGrid(width: number, height: number, base: TileKind, rects: Rect[] =
 }
 
 function markWarp(tiles: TileKind[][], x: number, y: number, kind: TileKind = 'path') { if (tiles[y]?.[x] !== undefined) tiles[y][x] = kind; }
-function building(id: string, x: number, y: number, width: number, label: string, interiorMap: string): BuildingDefinition { return { id, x, y, width, height: 4, label, doorX: x + Math.floor(width / 2), interiorMap }; }
+function building(id: string, x: number, y: number, width: number, label: string, interiorMap: string): BuildingDefinition { return { id, x, y, width, height: 4, label, doorX: x + Math.floor(width / 2) - 1, interiorMap }; }
 
 function interior(id: string, name: string, exit: { mapId: string; x: number; y: number; reciprocal: string }, role: 'home' | 'heal' | 'shop' | 'lodge' | 'hall', people: NpcDefinition[] = [], boss?: TrainerDefinition): MapDefinition {
   const tiles = tileGrid(15, 10, 'floor', [

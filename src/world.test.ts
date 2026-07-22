@@ -3,7 +3,7 @@ import type { TrainerDefinition } from './types';
 import { facingFrame, terrain3x3Frame, trainerHasLineOfSight } from './world';
 
 const trainer = (facing: TrainerDefinition['facing']): TrainerDefinition => ({
-  id: 't', x: 5, y: 5, name: 'Scout', dialogue: [], sprite: 'trainer', facing,
+  id: 't', x: 5, y: 5, name: 'Scout', dialogue: [], sprite: 'rival', facing,
   party: [], sight: 4, flag: 'defeated:t', reward: 1,
 });
 

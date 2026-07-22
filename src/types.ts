@@ -173,7 +173,7 @@ export interface ItemDefinition {
 export interface InventoryStack { itemId: string; count: number }
 
 export interface WarpDefinition { id: string; x: number; y: number; toMap: string; toX: number; toY: number; reciprocal: string }
-export type NpcSprite = 'villager' | 'traveler' | 'trainer' | 'warden';
+export type NpcSprite = 'professor' | 'assistant' | 'healer' | 'merchant' | 'elder' | 'ranger' | 'miner' | 'rival';
 export interface NpcDefinition { id: string; x: number; y: number; name: string; dialogue: string[]; sprite: NpcSprite; facing: Direction }
 export interface TrainerDefinition extends NpcDefinition { party: Array<{ speciesId: string; level: number }>; sight: number; flag: string; boss?: boolean; reward: number }
 export interface ItemPickup { id: string; x: number; y: number; itemId: string; count: number; hidden?: boolean }

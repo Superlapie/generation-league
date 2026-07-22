@@ -11,7 +11,6 @@ import { DIRECTION_DELTAS, facingFrame, oppositeDirection, terrain3x3Frame, trai
 
 const TILE = 16;
 const BLOCKED = new Set<TileKind>(['tree','wall','water','rock','counter']);
-const NPC_TINTS = { villager: 0xd9f3ff, traveler: 0xffd19a, trainer: 0xb7e4a1, warden: 0xffd471 };
 const GRASS_FRAMES = [264,264,264,265,266];
 const DEEP_GRASS_FRAMES = [275,275,275,276,277];
 const ROCK_FRAMES = [364,364,365,386,387];
@@ -88,7 +87,7 @@ export class OverworldScene extends Phaser.Scene {
     if(this.map.kind!=='interior')this.renderWorldDetails();
     const people: Array<NpcDefinition|TrainerDefinition> = [...this.map.npcs,...this.map.trainers.filter((t)=>this.trainerActive(t))];
     people.forEach((person)=>{
-      const sprite=this.add.sprite(person.x*TILE+8,person.y*TILE+8,'npc-base',facingFrame(person.facing)).setDepth(this.worldDepth(person.y*TILE+8)).setTint(NPC_TINTS[person.sprite]);
+      const sprite=this.add.sprite(person.x*TILE+8,person.y*TILE+8,`npc-${person.sprite}`,facingFrame(person.facing)).setDepth(this.worldDepth(person.y*TILE+8));
       sprite.setData('id',person.id);this.actors.set(person.id,sprite);
       if ('party' in person && this.trainerActive(person)) this.add.image(person.x*TILE+8,person.y*TILE-7,'pixel-white').setDisplaySize(3,3).setTint(person.boss?0xffd34e:0xe8efc7).setDepth(11);
     });

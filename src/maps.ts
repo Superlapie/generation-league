@@ -1,8 +1,18 @@
 import type { BuildingDefinition, Direction, MapDefinition, NpcDefinition, NpcSprite, TileKind, TrainerDefinition, WarpDefinition } from './types';
 
 type Rect = { x: number; y: number; w: number; h: number; tile: TileKind };
-const npc = (id: string, x: number, y: number, name: string, dialogue: string[], sprite: NpcSprite | 'b' = 'villager', facing: Direction = 'down'): NpcDefinition => ({ id, x, y, name, dialogue, sprite: sprite === 'b' ? 'traveler' : sprite, facing });
-const trainer = (id: string, x: number, y: number, name: string, dialogue: string[], party: TrainerDefinition['party'], sight = 4, boss = false, reward = 320, facing: Direction = 'down'): TrainerDefinition => ({ id, x, y, name, dialogue, sprite: boss ? 'warden' : 'trainer', facing, party, sight, flag: `defeated:${id}`, boss, reward });
+const autoNpcSprite = (id: string, name: string): NpcSprite => {
+  const role = `${id} ${name}`.toLowerCase();
+  if (role.includes('professor')) return 'professor';
+  if (role.includes('assistant')) return 'assistant';
+  if (role.includes('healer')) return 'healer';
+  if (role.includes('clerk') || role.includes('vendor') || role.includes('merchant') || role.includes('peddler')) return 'merchant';
+  if (role.includes('elder') || role.includes('keeper') || role.includes('parent') || role.includes('resident')) return 'elder';
+  if (role.includes('miner') || role.includes('smith') || role.includes('baker') || role.includes('potter')) return 'miner';
+  return 'ranger';
+};
+const npc = (id: string, x: number, y: number, name: string, dialogue: string[], sprite?: NpcSprite | 'b', facing: Direction = 'down'): NpcDefinition => ({ id, x, y, name, dialogue, sprite: sprite === 'b' ? 'merchant' : sprite ?? autoNpcSprite(id, name), facing });
+const trainer = (id: string, x: number, y: number, name: string, dialogue: string[], party: TrainerDefinition['party'], sight = 4, boss = false, reward = 320, facing: Direction = 'down'): TrainerDefinition => ({ id, x, y, name, dialogue, sprite: 'rival', facing, party, sight, flag: `defeated:${id}`, boss, reward });
 const warp = (id: string, x: number, y: number, toMap: string, toX: number, toY: number, reciprocal: string): WarpDefinition => ({ id, x, y, toMap, toX, toY, reciprocal });
 
 function tileGrid(width: number, height: number, base: TileKind, rects: Rect[] = []) {

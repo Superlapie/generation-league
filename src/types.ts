@@ -44,10 +44,23 @@ export interface SpeciesDefinition {
   animationKeys: string[];
 }
 
-export type MoveEffect =
-  | 'damage' | 'burn' | 'poison' | 'paralyze' | 'sleep'
-  | 'heal' | 'drain' | 'recoil' | 'raise' | 'lower'
-  | 'multiHit' | 'weather' | 'protect' | 'priority' | 'cleanse';
+export type FieldEffect = 'sunshower' | 'tailwind' | 'monsoon' | 'cinderfall';
+export type EffectOperation =
+  | { kind: 'damage'; power?: number; category?: Exclude<MoveCategory, 'Status'> }
+  | { kind: 'heal'; amount?: 'flat' | 'ratio'; ratio?: number; value?: number }
+  | { kind: 'applyStatus'; status: Exclude<MajorStatus, null>; chance?: number }
+  | { kind: 'modifyStage'; target: 'self' | 'foe'; stat: BattleStat; stages: number; chance?: number }
+  | { kind: 'drain'; ratio: number }
+  | { kind: 'recoil'; ratio: number }
+  | { kind: 'multiHit'; min: number; max: number }
+  | { kind: 'setField'; field: FieldEffect; turns: number }
+  | { kind: 'protect' }
+  | { kind: 'cleanse'; healRatio?: number }
+  | { kind: 'chance'; chance: number; effects: EffectOperation[] }
+  | { kind: 'sequence'; effects: EffectOperation[] };
+
+/** @deprecated Use MoveDefinition.effects. Kept only for save/content migration. */
+export type MoveEffect = EffectOperation['kind'] | 'burn' | 'poison' | 'paralyze' | 'sleep' | 'raise' | 'lower' | 'weather' | 'priority';
 
 export interface MoveDefinition {
   id: string;
@@ -59,7 +72,10 @@ export interface MoveDefinition {
   priority: number;
   target: 'self' | 'foe';
   category: MoveCategory;
-  effect: MoveEffect;
+  /** Declarative, composable move behavior. */
+  effects?: EffectOperation[];
+  /** @deprecated Legacy shorthand accepted while older content migrates. */
+  effect?: MoveEffect;
   effectChance?: number;
   effectStatus?: Exclude<MajorStatus, null>;
   stat?: BattleStat;
@@ -67,7 +83,7 @@ export interface MoveDefinition {
   minHits?: number;
   maxHits?: number;
   ratio?: number;
-  field?: 'sunshower' | 'tailwind' | 'monsoon' | 'cinderfall';
+  field?: FieldEffect;
   animation: string;
   audioCue: string;
   description: string;
@@ -149,6 +165,7 @@ export interface ItemDefinition {
   category: 'recovery' | 'capture' | 'battle' | 'held' | 'key';
   price: number;
   description: string;
+  effects?: EffectOperation[];
   heal?: number;
   captureModifier?: number;
 }

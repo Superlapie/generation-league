@@ -1,4 +1,5 @@
 import type { CreatureInstance, ItemDefinition, MoveDefinition, SpeciesDefinition, Stats } from './types';
+import { moveEffects } from './effects';
 import { calculateStats, expForLevel, NATURES, SeededRng, ZERO_STATS } from './rules';
 
 const S = (hp: number, attack: number, defense: number, spAttack: number, spDefense: number, speed: number): Stats => ({ hp, attack, defense, spAttack, spDefense, speed });
@@ -78,6 +79,10 @@ export const MOVES: Record<string, MoveDefinition> = {
   bramblewheel: { id: 'bramblewheel', name: 'Bramble Wheel', type: 'Verdant', power: 90, accuracy: 90, pp: 10, priority: 0, target: 'foe', category: 'Physical', effect: 'recoil', ratio: 0.2, animation: 'bramble-wheel', audioCue: 'leaf-heavy', description: 'A thorned wheel crashes into the foe.' },
 };
 
+// Materialize the declarative operation list once so the battle engine never
+// needs to interpret legacy move names during a turn.
+Object.values(MOVES).forEach((move) => { move.effects ??= moveEffects(move); });
+
 const line = (id: string, name: string, lineName: string, stage: 1 | 2 | 3, types: SpeciesDefinition['types'], baseStats: Stats, growthCurve: SpeciesDefinition['growthCurve'], captureRate: number, baseExp: number, abilities: string[], learnset: Array<[number, string]>, spriteUrl: string, evolution?: SpeciesDefinition['evolution'], assetRoot = A): SpeciesDefinition => {
   const meta = CREATURE_META[id];
   return {
@@ -132,9 +137,9 @@ export const SPECIES: Record<string, SpeciesDefinition> = {
 };
 
 export const ITEMS: Record<string, ItemDefinition> = {
-  tonic: { id: 'tonic', name: 'Moss Tonic', category: 'recovery', price: 180, heal: 30, description: 'Restores 30 HP.' },
-  superTonic: { id: 'superTonic', name: 'Bright Tonic', category: 'recovery', price: 520, heal: 80, description: 'Restores 80 HP.' },
-  fullMend: { id: 'fullMend', name: 'Full Mend', category: 'recovery', price: 700, description: 'Cures all status.' },
+  tonic: { id: 'tonic', name: 'Moss Tonic', category: 'recovery', price: 180, heal: 30, effects: [{ kind: 'heal', amount: 'flat', value: 30 }], description: 'Restores 30 HP.' },
+  superTonic: { id: 'superTonic', name: 'Bright Tonic', category: 'recovery', price: 520, heal: 80, effects: [{ kind: 'heal', amount: 'flat', value: 80 }], description: 'Restores 80 HP.' },
+  fullMend: { id: 'fullMend', name: 'Full Mend', category: 'recovery', price: 700, effects: [{ kind: 'cleanse' }], description: 'Cures all status.' },
   prismPod: { id: 'prismPod', name: 'Prism Pod', category: 'capture', price: 200, captureModifier: 1, description: 'A safe vessel for befriending wild creatures.' },
   greatPod: { id: 'greatPod', name: 'Lumen Pod', category: 'capture', price: 600, captureModifier: 1.5, description: 'A stronger capture vessel.' },
   emberCharm: { id: 'emberCharm', name: 'Ember Charm', category: 'held', price: 900, description: 'Slightly strengthens Ember moves.' },

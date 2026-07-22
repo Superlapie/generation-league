@@ -3,6 +3,7 @@ import { audio } from '../audio';
 import { controls } from '../controls';
 import { ITEMS, MOVES, REGIONAL_GUIDE, SPECIES } from '../data';
 import { configureGbaCamera } from '../display';
+import { applyItemEffects } from '../effects';
 import { calculateStats } from '../rules';
 import { gameStore } from '../state';
 import type { CreatureInstance, GameOptions, ItemDefinition } from '../types';
@@ -371,7 +372,7 @@ export class MenuScene extends Phaser.Scene {
       return;
     }
     if (this.page === 'summary') return;
-    if (this.page === 'bag') { const stack = this.bagStacks()[this.cursor]; if (!stack) return; const item = ITEMS[stack.itemId]; const lead = save.party[this.itemTarget] ?? save.party[0]; if (item.heal && lead) { const max = calculateStats(lead, SPECIES[lead.speciesId]).hp; if (lead.currentHp < max && gameStore.useItem(stack.itemId)) { lead.currentHp = Math.min(max, lead.currentHp + item.heal); this.note = `${lead.nickname || SPECIES[lead.speciesId].name} recovered.`; audio.sfx('heal'); } } else if (item.category === 'held' && lead) { lead.heldItem = item.id; this.note = `${lead.nickname || SPECIES[lead.speciesId].name} holds ${item.name}.`; } this.render(); return; }
+    if (this.page === 'bag') { const stack = this.bagStacks()[this.cursor]; if (!stack) return; const item = ITEMS[stack.itemId]; const lead = save.party[this.itemTarget] ?? save.party[0]; if (item.effects?.length && lead) { const events = applyItemEffects(item, lead, SPECIES[lead.speciesId], gameStore.rng); if (events.length && gameStore.useItem(stack.itemId)) { this.note = events[events.length - 1].text; audio.sfx('heal'); } else this.note = 'It would have no effect.'; } else if (item.category === 'held' && lead) { lead.heldItem = item.id; this.note = `${lead.nickname || SPECIES[lead.speciesId].name} holds ${item.name}.`; } this.render(); return; }
     if (this.page === 'guide') return;
     if (this.page === 'card') { this.back(); return; }
     if (this.page === 'options') { if (this.cursor === this.optionRows().length - 1) this.back(); else this.adjustOption(1); return; }

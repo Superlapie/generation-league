@@ -3,8 +3,11 @@ import { configureGbaCamera } from '../display';
 import { audio } from '../audio';
 import { controls } from '../controls';
 import { createCreature, ITEMS, MOVES, SPECIES } from '../data';
+import { applyItemEffects } from '../effects';
 import { BASE_STAGES, calculateStats, captureChance, chooseTrainerAction, resolveTurn } from '../rules';
 import { gameStore } from '../state';
+import { rewardMultiplier } from '../triggers';
+import { movePresentation } from '../presentation';
 import type { BattleAction, BattleContext, BattleEvent, CreatureInstance, TrainerDefinition } from '../types';
 import { COLORS, hpColor, label, panel, textStyle } from '../ui';
 
@@ -108,8 +111,11 @@ export class BattleScene extends Phaser.Scene {
     this.showText(`${species.name} broke free!`);await this.wait(700);await this.perform({kind:'capture',itemId},true);
   }
   private async useItem(itemId:string){
-    const item=ITEMS[itemId],creature=this.player();if(item.heal){const max=calculateStats(creature,this.playerSpecies()).hp;if(creature.currentHp>=max){this.showText('It would have no effect.');return;}gameStore.useItem(itemId);const amount=Math.min(item.heal,max-creature.currentHp);creature.currentHp+=amount;this.showText(`${item.name} restored ${amount} HP!`);audio.sfx('heal');this.updateHpBars();await this.wait(550);await this.perform({kind:'item',itemId},true);return;}
-    if(item.id==='fullMend'){if(!creature.status){this.showText('It would have no effect.');return;}gameStore.useItem(itemId);creature.status=null;this.showText(`${creature.nickname||this.playerSpecies().name} was cured!`);await this.wait(500);await this.perform({kind:'item',itemId},true);}
+    const item=ITEMS[itemId],creature=this.player(),species=this.playerSpecies(),events:BattleEvent[]=[];
+    if(!item.effects?.length){this.showText('It would have no effect.');return;}
+    events.push(...applyItemEffects(item,creature,species,gameStore.rng));
+    if(!events.length || (events.every((event)=>event.kind==='heal'&&event.amount===0))){this.showText('It would have no effect.');return;}
+    gameStore.useItem(itemId);events.forEach((event)=>this.showText(event.text));audio.sfx('heal');this.updateHpBars();await this.wait(550);await this.perform({kind:'item',itemId},true);
   }
   private async perform(action:BattleAction,alreadyLocked=false){
     if(!alreadyLocked){this.locked=true;this.mode='locked';this.clearMenu();}
@@ -139,7 +145,7 @@ export class BattleScene extends Phaser.Scene {
     this.locked=false;this.openCommand();
   }
   private async victory(){
-    audio.sfx('victory');if(this.trainer){gameStore.defeat(this.trainer.flag);const reward=Math.floor(this.trainer.reward*(this.player().ability==='Prospector'?1.2:1));gameStore.save!.money+=reward;this.showText(`Victory! You received ${reward} Lumen.`);if(this.trainer.id==='warden-lyra'){gameStore.awardCrest('glimmer');this.showText('Warden Lyra awarded the Glimmer Crest!');}if(this.trainer.id==='warden-kael'){gameStore.awardCrest('cinder');this.showText('Warden Kael awarded the Cinder Crest!');}if(this.trainer.id==='warden-selene'){gameStore.awardCrest('tide');gameStore.addFlag('champion');this.showText('Warden Selene awarded the Tide Crest!');}await this.wait(1300);}else{this.showText('The wild creature was overcome.');await this.wait(650);}
+    audio.sfx('victory');if(this.trainer){gameStore.defeat(this.trainer.flag);const reward=Math.floor(this.trainer.reward*rewardMultiplier(this.player()));gameStore.save!.money+=reward;this.showText(`Victory! You received ${reward} Lumen.`);if(this.trainer.id==='warden-lyra'){gameStore.awardCrest('glimmer');this.showText('Warden Lyra awarded the Glimmer Crest!');}if(this.trainer.id==='warden-kael'){gameStore.awardCrest('cinder');this.showText('Warden Kael awarded the Cinder Crest!');}if(this.trainer.id==='warden-selene'){gameStore.awardCrest('tide');gameStore.addFlag('champion');this.showText('Warden Selene awarded the Tide Crest!');}await this.wait(1300);}else{this.showText('The wild creature was overcome.');await this.wait(650);}
     gameStore.autoSave();if(this.trainer?.id==='warden-selene'){this.scene.start('Credits');return;}this.returnToWorld();
   }
   private async defeat(){audio.stopMusic();this.showText('Your party is exhausted… You return to Mossmere.');await this.wait(1100);gameStore.healAll();gameStore.setLocation('mossmere',12,10);gameStore.autoSave();this.scene.start('Overworld');}
@@ -156,10 +162,10 @@ export class BattleScene extends Phaser.Scene {
   private async animateMove(side:'player'|'enemy',moveId:string){
     const move=MOVES[moveId],attacker=side==='player'?this.playerSprite:this.enemySprite,target=side==='player'?this.enemySprite:this.playerSprite;audio.sfx(move.audioCue);
     const home={x:attacker.x,y:attacker.y};await this.tween({targets:attacker,x:attacker.x+(side==='player'?14:-14),y:attacker.y+(side==='player'?-7:7),duration:110,ease:'Quad.Out'});
-    const color=move.type==='Ember'?0xf16b3a:move.type==='Tide'?0x56b9ca:move.type==='Verdant'?0x72b64b:move.type==='Wind'?0xe7e5ad:0xd1b47b;
+    const presentation=movePresentation(move);const color=presentation.impactTint;
     const burst=this.add.particles(target.x,target.y,'pixel-circle',{speed:{min:25,max:75},angle:{min:0,max:360},lifespan:280,quantity:12,scale:{start:.42,end:0},tint:color,blendMode:'ADD'}).setDepth(12);burst.explode(14);
-    if(move.animation.includes('beam')||move.animation.includes('wave')||move.animation.includes('fire')||move.animation.includes('leaf')||move.power>0){const bolt=this.add.rectangle(attacker.x,attacker.y,move.type==='Wind'?26:8,move.type==='Wind'?2:8,color,.9).setDepth(11).setAngle(move.type==='Wind'?-25:0);await this.tween({targets:bolt,x:target.x,y:target.y,duration:220,ease:'Quad.In'});bolt.destroy();}
-    this.cameras.main.shake(move.power>=90?150:80,move.power>=90?.012:.006);target.setAlpha(.28);await this.wait(70);target.setAlpha(1);await this.tween({targets:attacker,x:home.x,y:home.y,duration:130,ease:'Quad.In'});this.time.delayedCall(320,()=>burst.destroy());
+    if(presentation.projectile){const bolt=this.add.rectangle(attacker.x,attacker.y,presentation.projectileWidth,presentation.projectileHeight,color,.9).setDepth(11).setAngle(move.type==='Wind'?-25:0);await this.tween({targets:bolt,x:target.x,y:target.y,duration:220,ease:'Quad.In'});bolt.destroy();}
+    this.cameras.main.shake(move.power>=90?150:80,presentation.cameraShake);target.setAlpha(.28);await this.wait(70);target.setAlpha(1);await this.tween({targets:attacker,x:home.x,y:home.y,duration:130,ease:'Quad.In'});this.time.delayedCall(320,()=>burst.destroy());
   }
   private async damageFlash(side:'player'|'enemy'){const target=side==='player'?this.playerSprite:this.enemySprite;await this.tween({targets:target,alpha:.2,duration:55,yoyo:true,repeat:2});}
   private async healAnimation(side:'player'|'enemy'){audio.sfx('heal');const target=side==='player'?this.playerSprite:this.enemySprite;const particles=this.add.particles(target.x,target.y+18,'pixel-circle',{speedY:{min:-45,max:-18},speedX:{min:-12,max:12},lifespan:650,quantity:8,scale:{start:.28,end:0},tint:0x8de56d,blendMode:'ADD'}).setDepth(12);particles.explode(12);await this.wait(520);particles.destroy();}

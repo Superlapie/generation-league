@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { gameStore } from './state';
 
 type Cue = 'confirm'|'cancel'|'step'|'grass'|'door'|'heal'|'capture'|'victory'|'thud'|'slice'|'shine'|'gust'|'leaf'|'vine'|'spore'|'drain'|'leaf-heavy'|'fire'|'puff'|'fire-heavy'|'rumble'|'bubble'|'chime'|'barrier'|'wave'|'beam'|'rock'|'slice-heavy';
+export const AUDIO_CUES = ['confirm','cancel','step','grass','door','heal','capture','victory','thud','slice','shine','gust','leaf','vine','spore','drain','leaf-heavy','fire','puff','fire-heavy','rumble','bubble','chime','barrier','wave','beam','rock','slice-heavy'] as const;
 
 class AudioDirector {
   private current: Phaser.Sound.BaseSound | null = null;

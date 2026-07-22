@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { createCreature, evolutionAt, ITEMS, MOVES, REGIONAL_GUIDE, SPECIES } from './data';
+import { applyItemEffects, moveEffects } from './effects';
+import { AUDIO_CUES } from './audio';
+import { MOVE_PRESENTATIONS } from './presentation';
+import { validateTriggerRegistry } from './triggers';
 import { MAPS, validateWorld } from './maps';
 import { BASE_STAGES, calculateStats, captureChance, chooseTrainerAction, damageRoll, expForLevel, resolveTurn, sanitizeEvs, SeededRng, typeEffectiveness } from './rules';
 import type { Rng } from './rules';
@@ -22,6 +26,28 @@ describe('campaign data',()=>{
     }
     expect(Object.keys(MOVES).length).toBeGreaterThanOrEqual(30);
     expect(Object.values(ITEMS).some((item)=>item.category==='capture')).toBe(true);
+  });
+
+  it('validates composable effects, presentation cues, audio cues, and trigger registries',()=>{
+    Object.values(MOVES).forEach((move)=>{
+      expect(move.effects?.length).toBeGreaterThan(0);
+      moveEffects(move).forEach((effect)=>expect(effect.kind).toBeTruthy());
+      expect(MOVE_PRESENTATIONS[move.animation]).toBeDefined();
+      expect(AUDIO_CUES).toContain(move.audioCue);
+    });
+    const abilities=[...new Set(Object.values(SPECIES).flatMap((species)=>species.abilities))];
+    const held=[...new Set(Object.values(ITEMS).filter((item)=>item.category==='held').map((item)=>item.id))];
+    expect(validateTriggerRegistry(abilities,held)).toEqual({missingAbilities:[],missingItems:[]});
+  });
+
+  it('executes item effects through the same operation interpreter',()=>{
+    const creature=createCreature('cragbud',20,'Test','test',new SeededRng(11));
+    creature.currentHp=1;
+    expect(applyItemEffects(ITEMS.tonic,creature,SPECIES.cragbud,new SeededRng(12)).some((event)=>event.kind==='heal')).toBe(true);
+    expect(creature.currentHp).toBeGreaterThan(1);
+    creature.status='burn';
+    expect(applyItemEffects(ITEMS.fullMend,creature,SPECIES.cragbud,new SeededRng(13)).some((event)=>event.kind==='status')).toBe(true);
+    expect(creature.status).toBeNull();
   });
   it('contains the complete connected campaign with reciprocal exits',()=>{
     expect(validateWorld()).toEqual([]);
@@ -71,8 +97,8 @@ describe('generation-style progression rules',()=>{
     expect(events.map((event)=>event.kind)).toEqual(['switch']);expect(battle.player.active).toBe(1);expect(replacement.currentHp).toBe(hp);expect(battle.enemy.party[0].moves[0].pp).toBe(5);expect(battle.turn).toBe(0);expect(battle.field.turns).toBe(3);
   });
   it('supports healing, recoil, drain, multi-hit, stat stages and field effects',()=>{
-    const effects=['heal','recoil','drain','multiHit','raise','lower','weather'];
-    effects.forEach((effect)=>expect(Object.values(MOVES).some((move)=>move.effect===effect),effect).toBe(true));
+    const effects=['heal','recoil','drain','multiHit','modifyStage','setField'];
+    effects.forEach((effect)=>expect(Object.values(MOVES).some((move)=>moveEffects(move).some((operation)=>operation.kind===effect)),effect).toBe(true));
     const battle=contextFor();battle.player.party[0].moves=[{moveId:'tailwind',pp:2,maxPp:2}];resolveTurn(battle,{kind:'move',moveIndex:0},{kind:'switch',partyIndex:0},SPECIES,MOVES,fixedRng(.2));expect(battle.field.effect).toBe('tailwind');expect(battle.field.turns).toBe(4);
   });
   it('uses HP, status, capture rate and item modifier for capture probability',()=>{

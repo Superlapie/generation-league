@@ -73,7 +73,7 @@ export class BattleScene extends Phaser.Scene {
     if(this.mode==='command'){this.drawGrid(['FIGHT','BAG','PARTY',this.context.kind==='wild'?'RUN':'FORFEIT']);return;}
     if(this.mode==='moves'){
       const known=this.player().moves;const names=Array.from({length:4},(_,i)=>known[i]?MOVES[known[i].moveId].name:'—');this.drawGrid(names);
-      const selected=known[this.cursor];if(selected){const move=MOVES[selected.moveId];const info=label(this,133,147,`PP ${selected.pp}/${move.pp}  ${move.type.toUpperCase()}`,6,'#59684f',30);this.uiObjects.push(info);}return;
+      const selected=known[this.cursor];if(selected){const move=MOVES[selected.moveId];const info=label(this,133,147,`PP ${selected.pp}/${selected.maxPp}  ${move.type.toUpperCase()}`,6,'#59684f',30);this.uiObjects.push(info);}return;
     }
     if(this.mode==='party'){
       this.context.player.party.forEach((creature,index)=>{const species=SPECIES[creature.speciesId],max=calculateStats(creature,species).hp;this.drawRow(index,`${creature.nickname||species.name} Lv${creature.level}  ${creature.currentHp}/${max}`,index===this.context.player.active?'ACTIVE':'');});return;
@@ -123,7 +123,7 @@ export class BattleScene extends Phaser.Scene {
     await this.afterTurn();
   }
   private async playEvent(event:BattleEvent){
-    if(event.kind==='move'&&event.side){this.showText(event.text);await this.animateMove(event.side,event.moveId!);return;}
+    if(event.kind==='move'&&event.side){this.showText(event.text);if(gameStore.save?.options.battleScene!==false)await this.animateMove(event.side,event.moveId!);else{audio.sfx(MOVES[event.moveId!].audioCue);await this.wait(120);}return;}
     if(event.kind==='damage'&&event.side){if(event.text)this.showText(event.text);await this.damageFlash(event.side);this.updateHpBars();if(event.text)await this.wait(350);return;}
     if(event.kind==='heal'&&event.side){this.showText(event.text);await this.healAnimation(event.side);this.updateHpBars();return;}
     if(event.kind==='status'||event.kind==='stage'||event.kind==='miss'||event.kind==='field'||event.kind==='switch'){this.showText(event.text);if(event.kind==='switch')this.swapSprite(event.side!);await this.wait(650);return;}

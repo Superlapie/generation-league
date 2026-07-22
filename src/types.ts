@@ -187,7 +187,17 @@ export interface MapDefinition {
   storyGate?: { flag: string; x: number; y: number; message: string };
 }
 
-export interface GameOptions { musicVolume: number; sfxVolume: number; muted: boolean; textSpeed: 'slow' | 'normal' | 'fast' }
+export interface GameOptions {
+  musicVolume: number;
+  sfxVolume: number;
+  muted: boolean;
+  textSpeed: 'slow' | 'normal' | 'fast';
+  battleScene: boolean;
+  battleStyle: 'shift' | 'set';
+  sound: 'mono' | 'stereo';
+  buttonMode: 'normal' | 'lr' | 'lEqualsA';
+  frame: number;
+}
 export interface GameSaveV1 {
   schemaVersion: 1;
   migrationVersion?: number;

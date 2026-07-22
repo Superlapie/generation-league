@@ -8,7 +8,7 @@ const RECOVERY = ['generation-league:recovery:0:v1', 'generation-league:recovery
 const OPTIONS = 'generation-league:options:v1';
 
 interface SaveEnvelope { checksum: string; payload: GameSaveV1 }
-const defaultOptions: GameOptions = { musicVolume: 0.42, sfxVolume: 0.65, muted: false, textSpeed: 'normal' };
+const defaultOptions: GameOptions = { musicVolume: 0.42, sfxVolume: 0.65, muted: false, textSpeed: 'normal', battleScene: true, battleStyle: 'shift', sound: 'stereo', buttonMode: 'normal', frame: 1 };
 
 function hash(text: string) {
   let value = 2166136261;
@@ -31,7 +31,7 @@ export function decodeSave(raw: string | null): GameSaveV1 | null {
     const party = parsed.payload.party.map((creature, index) => migrateCreature(creature, `party-${index}`));
     const storage = parsed.payload.storage.map((creature, index) => migrateCreature(creature, `storage-${index}`));
     if (!party.length) return null;
-    return { ...parsed.payload, migrationVersion: 2, party, storage };
+    return { ...parsed.payload, migrationVersion: 2, options: normalizeOptions(parsed.payload.options), party, storage };
   } catch { return null; }
 }
 
@@ -66,8 +66,24 @@ function migrateCreature(input: CreatureInstance, fallbackId: string): CreatureI
   return creature;
 }
 
+function normalizeOptions(input: Partial<GameOptions> | null | undefined): GameOptions {
+  const raw = input ?? {};
+  return {
+    ...defaultOptions,
+    ...raw,
+    musicVolume: clamp(Number(raw.musicVolume ?? defaultOptions.musicVolume), 0, 1),
+    sfxVolume: clamp(Number(raw.sfxVolume ?? defaultOptions.sfxVolume), 0, 1),
+    textSpeed: raw.textSpeed === 'slow' || raw.textSpeed === 'fast' ? raw.textSpeed : 'normal',
+    battleScene: raw.battleScene !== false,
+    battleStyle: raw.battleStyle === 'set' ? 'set' : 'shift',
+    sound: raw.sound === 'mono' ? 'mono' : 'stereo',
+    buttonMode: raw.buttonMode === 'lr' || raw.buttonMode === 'lEqualsA' ? raw.buttonMode : 'normal',
+    frame: clamp(Math.floor(Number(raw.frame ?? 1)), 1, 20),
+  };
+}
+
 function loadOptions(): GameOptions {
-  try { return { ...defaultOptions, ...JSON.parse(localStorage.getItem(OPTIONS) || '{}') }; } catch { return { ...defaultOptions }; }
+  try { return normalizeOptions(JSON.parse(localStorage.getItem(OPTIONS) || '{}')); } catch { return { ...defaultOptions }; }
 }
 
 function starterInventory(): InventoryStack[] {
@@ -116,7 +132,7 @@ export class GameStore {
   }
   setOptions(next: Partial<GameOptions>) {
     if (!this.save) return;
-    this.save.options = { ...this.save.options, ...next };
+    this.save.options = normalizeOptions({ ...this.save.options, ...next });
     localStorage.setItem(OPTIONS, JSON.stringify(this.save.options));
   }
   flag(flag: string) { return this.save?.storyFlags.includes(flag) ?? false; }

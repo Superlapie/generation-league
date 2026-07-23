@@ -72,7 +72,7 @@ export class IntroScene extends Phaser.Scene {
     (['a','b'] as const).forEach((id,index)=>{
       const selected=this.avatar===id;
       const bg=this.keep(this.add.rectangle(54+index*94,51,66,62,selected?0x7f9f88:0xb9c29f).setOrigin(0).setInteractive());
-      const sprite=this.keep(this.add.sprite(87+index*94,78,`avatar-${id}`,0).setScale(3));
+      const sprite=this.keep(this.add.sprite(87+index*94,78,`avatar-${id}`,0).setScale(2));
       this.keep(this.add.rectangle(87+index*94,108,54,11,selected?0x6f8f78:0xc6cfaa).setDepth(2));
       this.keep(label(this,87+index*94,105,id==='a'?'TRAIL':'TIDE',7,selected?'#ffffff':'#59684f',3)).setOrigin(.5,0);
       bg.on('pointerdown',()=>{this.avatar=id;this.render();});sprite.setDepth(2);
@@ -82,7 +82,7 @@ export class IntroScene extends Phaser.Scene {
   private renderIntro(){
     this.keep(this.add.rectangle(0,0,240,160,0x172519).setOrigin(0));
     this.keep(this.add.circle(120,52,34,0x87a966));
-    this.keep(this.add.sprite(120,54,'avatar-b',0).setScale(3));
+    this.keep(this.add.sprite(120,54,'avatar-b',0).setScale(2));
     this.keep(panel(this,8,91,224,61,COLORS.paper,3));
     this.keep(this.add.text(16,99,`PROFESSOR ASTER:\nWelcome, ${this.nameValue}. Five creature lines share our region.\nEarn three Crests—not for glory, but to learn what strength protects.`,textStyle(8,'#182017')).setDepth(4).setWordWrapWidth(208));
     this.keep(label(this,219,139,'▼',8,'#182017',5));

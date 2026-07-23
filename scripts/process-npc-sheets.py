@@ -10,8 +10,9 @@ names = [
 
 for name in names:
     image = Image.open(source_dir / f'{name}.png').convert('RGBA')
+    image.putalpha(image.getchannel('A').point(lambda alpha: 255 if alpha >= 128 else 0))
     width, height = image.size
-    sheet = Image.new('RGBA', (128, 128), (0, 0, 0, 0))
+    sheet = Image.new('RGBA', (192, 192), (0, 0, 0, 0))
     frames = []
     bounds = []
     for row in range(4):
@@ -34,13 +35,13 @@ for name in names:
     bottom = max(b[3] for b in bounds)
     crop_width = right - left
     crop_height = bottom - top
-    scale = min(29 / crop_height, 26 / crop_width)
+    scale = min(44 / crop_height, 38 / crop_width)
     scaled_size = (max(1, round(crop_width * scale)), max(1, round(crop_height * scale)))
 
     for row, column, frame in frames:
         character = frame.crop((left, top, right, bottom)).resize(scaled_size, Image.Resampling.NEAREST)
-        x = column * 32 + (32 - scaled_size[0]) // 2
-        y = row * 32 + 31 - scaled_size[1]
+        x = column * 48 + (48 - scaled_size[0]) // 2
+        y = row * 48 + 47 - scaled_size[1]
         sheet.alpha_composite(character, (x, y))
     sheet.save(output_dir / f'{name}.png', optimize=True)
     print(f'wrote {output_dir / (name + ".png")}')

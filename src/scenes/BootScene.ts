@@ -18,10 +18,10 @@ export class BootScene extends Phaser.Scene {
       this.load.image(`${species.id}-front`,`${spriteRoot}/${species.id}-front.png`);
       this.load.image(`${species.id}-back`,`${spriteRoot}/${species.id}-back.png`);
     });
-    this.load.spritesheet('avatar-a','assets/ninja-adventure/characters/player-female.png',{frameWidth:32,frameHeight:32});
-    this.load.spritesheet('avatar-b','assets/ninja-adventure/characters/player-male.png',{frameWidth:32,frameHeight:32});
+    this.load.spritesheet('avatar-a','assets/ninja-adventure/characters/player-female.png',{frameWidth:48,frameHeight:48});
+    this.load.spritesheet('avatar-b','assets/ninja-adventure/characters/player-male.png',{frameWidth:48,frameHeight:48});
     for (const npc of ['professor','assistant','healer','merchant','elder','ranger','miner','rival']) {
-      this.load.spritesheet(`npc-${npc}`,`assets/ninja-adventure/characters/${npc}.png`,{frameWidth:32,frameHeight:32});
+      this.load.spritesheet(`npc-${npc}`,`assets/ninja-adventure/characters/${npc}.png`,{frameWidth:48,frameHeight:48});
     }
     this.load.spritesheet('prop-grass','assets/ninja-adventure/props/grass.png',{frameWidth:16,frameHeight:16});
     this.load.spritesheet('prop-pig','assets/ninja-adventure/characters/pig.png',{frameWidth:16,frameHeight:16});

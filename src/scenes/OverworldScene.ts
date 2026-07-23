@@ -257,7 +257,7 @@ export class OverworldScene extends Phaser.Scene {
   }
   private trainerActive(trainer:TrainerDefinition){return !gameStore.hasDefeated(trainer.flag)||(Boolean(trainer.boss)&&gameStore.flag('champion'));}
   private startTrainer(trainer:TrainerDefinition){
-    if(this.modal||this.moving)return;const actor=this.actors.get(trainer.id);if(actor){const mark=this.add.text(actor.x,actor.y-18,'!',textStyle(15,'#f2d25f')).setOrigin(.5).setDepth(60).setStroke('#301f18',2);this.tweens.add({targets:mark,y:mark.y-5,duration:180,yoyo:true});}
+    if(this.modal||this.moving)return;const actor=this.actors.get(trainer.id);if(actor){const mark=this.add.text(actor.x,actor.y-42,'!',textStyle(15,'#f2d25f')).setOrigin(.5).setDepth(60).setStroke('#301f18',2);this.tweens.add({targets:mark,y:mark.y-5,duration:180,yoyo:true});}
     this.showDialogue(trainer.dialogue.map((line,index)=>index===0?`${trainer.name}: ${line}`:line),()=>this.encounterTransition(()=>this.scene.start('Battle',{kind:'trainer',trainer,mapId:this.map.id})));
   }
   private startWild(){

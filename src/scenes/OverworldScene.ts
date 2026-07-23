@@ -39,7 +39,7 @@ export class OverworldScene extends Phaser.Scene {
     this.position = { x: save.location.x, y: save.location.y };
     document.body.dataset.gameScene='overworld';document.body.dataset.map=this.map.id;document.body.dataset.position=`${this.position.x},${this.position.y}`;
     this.renderMap();
-    this.player = this.add.sprite(this.position.x*TILE+8,this.position.y*TILE+8,`avatar-${save.player.avatar}`,facingFrame(save.location.facing)).setDepth(this.worldDepth(this.position.y*TILE+8));
+    this.player = this.add.sprite(this.position.x*TILE+8,this.position.y*TILE+16,`avatar-${save.player.avatar}`,facingFrame(save.location.facing)).setOrigin(.5,1).setDepth(this.worldDepth(this.position.y*TILE+16));
     this.player.setData('facing',save.location.facing);
     this.cameras.main.setBounds(0,0,this.map.width*TILE,this.map.height*TILE).setRoundPixels(true);
     this.cameras.main.startFollow(this.player,true,.18,.18);
@@ -87,7 +87,7 @@ export class OverworldScene extends Phaser.Scene {
     if(this.map.kind!=='interior')this.renderWorldDetails();
     const people: Array<NpcDefinition|TrainerDefinition> = [...this.map.npcs,...this.map.trainers.filter((t)=>this.trainerActive(t))];
     people.forEach((person)=>{
-      const sprite=this.add.sprite(person.x*TILE+8,person.y*TILE+8,`npc-${person.sprite}`,facingFrame(person.facing)).setDepth(this.worldDepth(person.y*TILE+8));
+      const sprite=this.add.sprite(person.x*TILE+8,person.y*TILE+16,`npc-${person.sprite}`,facingFrame(person.facing)).setOrigin(.5,1).setDepth(this.worldDepth(person.y*TILE+16));
       sprite.setData('id',person.id);this.actors.set(person.id,sprite);
       if ('party' in person && this.trainerActive(person)) this.add.image(person.x*TILE+8,person.y*TILE-7,'pixel-white').setDisplaySize(3,3).setTint(person.boss?0xffd34e:0xe8efc7).setDepth(11);
     });
@@ -201,11 +201,11 @@ export class OverworldScene extends Phaser.Scene {
     if (!this.passable(tx,ty)) { this.bump(direction);this.lastStep=time;return; }
     if (this.map.storyGate && !gameStore.flag(this.map.storyGate.flag) && tx===this.map.storyGate.x&&ty===this.map.storyGate.y) { this.showDialogue([this.map.storyGate.message]);return; }
     this.moving=true;this.lastStep=time;this.position={x:tx,y:ty};gameStore.setLocation(this.map.id,tx,ty);
-    this.player.setDepth(this.worldDepth(ty*TILE+8));
+    this.player.setDepth(this.worldDepth(ty*TILE+16));
     document.body.dataset.position=`${tx},${ty}`;
     const running=controls.isDown('RUN')||controls.isDown('B');const duration=target==='ledge'?170:running?68:112;
     this.player.play(`${save.player.avatar}-${direction}`,true);audio.sfx(target==='tallGrass'?'grass':'step');
-    this.tweens.add({targets:this.player,x:tx*TILE+8,y:ty*TILE+8,duration,ease:'Linear',onComplete:()=>{
+    this.tweens.add({targets:this.player,x:tx*TILE+8,y:ty*TILE+16,duration,ease:'Linear',onComplete:()=>{
       this.player.stop();this.player.setFrame(facingFrame(direction));this.moving=false;
       this.afterStep(target);
     }});

@@ -39,12 +39,10 @@ for name in names:
     scaled_size = (max(1, round(crop_width * scale)), max(1, round(crop_height * scale)))
 
     for row, column, frame in frames:
-        character = frame.crop((left, top, right, bottom)).resize(scaled_size, Image.Resampling.LANCZOS)
+        character = frame.crop((left, top, right, bottom)).resize(scaled_size, Image.Resampling.NEAREST)
         character.putalpha(character.getchannel('A').point(lambda alpha: 255 if alpha >= 128 else 0))
-        palette = character.convert('RGB').quantize(colors=48, method=Image.Quantize.MEDIANCUT).convert('RGBA')
-        palette.putalpha(character.getchannel('A'))
         x = column * 32 + (32 - scaled_size[0]) // 2
         y = row * 32 + 31 - scaled_size[1]
-        sheet.alpha_composite(palette, (x, y))
+        sheet.alpha_composite(character, (x, y))
     sheet.save(output_dir / f'{name}.png', optimize=True)
     print(f'wrote {output_dir / (name + ".png")}')

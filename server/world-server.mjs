@@ -121,8 +121,8 @@ async function handleMessage(session, raw) {
   const payload = message.payload ?? {};
   if (message.type === 'ping') return send(session.socket, 'pong', {});
 
-  if (message.type === 'auth:register') return registerAccount(session, payload);
-  if (message.type === 'auth:login') return loginAccount(session, payload);
+  if (message.type === 'auth:register') { if (!allowed(session.accountId, 'auth', 6)) return fail(session, 'rate_limited', 'Please wait before trying again.'); return registerAccount(session, payload); }
+  if (message.type === 'auth:login') { if (!allowed(session.accountId, 'auth', 6)) return fail(session, 'rate_limited', 'Please wait before trying again.'); return loginAccount(session, payload); }
 
   if (message.type === 'hello') {
     const accountId = typeof payload.token === 'string' ? verifyToken(payload.token) : null;
@@ -188,7 +188,15 @@ async function handleMessage(session, raw) {
   if (message.type === 'player:inspect') {
     const profile = profiles.get(cleanText(payload.accountId));
     if (!profile) return fail(session, 'unknown_player', 'That player is no longer available.');
-    return send(session.socket, 'player:card', { ...profile, playTimeSeconds: 0, caughtCount: 0 });
+    return send(session.socket, 'player:card', {
+      accountId: profile.accountId,
+      displayName: cleanText(profile.displayName),
+      avatar: profile.avatar === 'b' ? 'b' : 'a',
+      crests: Array.isArray(profile.crests) ? profile.crests.slice(0, 32).map((crest) => cleanText(crest)) : [],
+      playTimeSeconds: 0,
+      caughtCount: Array.isArray(profile.guide?.caught) ? profile.guide.caught.length : 0,
+      joinedAt: Number.isFinite(profile.joinedAt) ? profile.joinedAt : Date.now(),
+    });
   }
   if (message.type === 'friend:request') return friendRequest(session, cleanText(payload.accountId));
   if (message.type === 'friend:respond') return friendRespond(session, cleanText(payload.accountId), Boolean(payload.accept));

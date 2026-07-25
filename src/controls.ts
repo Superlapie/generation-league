@@ -16,7 +16,15 @@ class Controls {
   init() {
     if (this.ready) return;
     this.ready = true;
-    window.addEventListener('keydown', (event) => { const key = keyMap[event.code]; if (!key) return; if (!this.held.has(key)) { this.fresh.add(key); this.bufferDirection(key); } this.held.add(key); event.preventDefault(); });
+    window.addEventListener('keydown', (event) => {
+      const target = event.target as HTMLElement | null;
+      if (target?.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return;
+      const key = keyMap[event.code];
+      if (!key) return;
+      if (!this.held.has(key)) { this.fresh.add(key); this.bufferDirection(key); }
+      this.held.add(key);
+      event.preventDefault();
+    });
     window.addEventListener('keyup', (event) => { const key = keyMap[event.code]; if (!key) return; this.held.delete(key); event.preventDefault(); });
     document.querySelectorAll<HTMLButtonElement>('[data-key]').forEach((button) => {
       const key = button.dataset.key as GameKey;

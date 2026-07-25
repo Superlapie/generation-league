@@ -59,6 +59,8 @@ export class GenerationNetworkClient {
   private pingTimer: number | null = null;
   private pingStartedAt = 0;
   private listeners = new Set<(message: ServerMessage) => void>();
+  private closeListeners = new Set<() => void>();
+  private suppressCloseEvent = false;
   latencyMs: number | null = null;
 
   connect(url: string, hello: Extract<ClientMessage, { type: 'hello' }>['payload'], options: { pingIntervalMs?: number } = {}) {
@@ -81,9 +83,20 @@ export class GenerationNetworkClient {
         this.listeners.forEach((listener) => listener(message as ServerMessage));
       } catch { /* Ignore malformed server frames. */ }
     });
+    socket.addEventListener('close', () => {
+      if (this.pingTimer !== null) window.clearInterval(this.pingTimer);
+      this.pingTimer = null;
+      this.socket = null;
+      if (!this.suppressCloseEvent) this.closeListeners.forEach((listener) => listener());
+      this.suppressCloseEvent = false;
+    });
   }
 
   onMessage(listener: (message: ServerMessage) => void) { this.listeners.add(listener); return () => this.listeners.delete(listener); }
+
+  onClose(listener: () => void) { this.closeListeners.add(listener); return () => this.closeListeners.delete(listener); }
+
+  isConnected() { return this.socket?.readyState === WebSocket.OPEN; }
 
   send<T extends ClientMessage['type']>(type: T, payload: Extract<ClientMessage, { type: T }>['payload']) {
     if (this.socket?.readyState !== WebSocket.OPEN) return false;
@@ -94,7 +107,9 @@ export class GenerationNetworkClient {
   close() {
     if (this.pingTimer !== null) window.clearInterval(this.pingTimer);
     this.pingTimer = null;
+    this.suppressCloseEvent = true;
     this.socket?.close();
     this.socket = null;
+    this.suppressCloseEvent = false;
   }
 }

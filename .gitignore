@@ -3,6 +3,7 @@ dist/
 .vercel/
 *.log
 *.tsbuildinfo
+server/.world-state.json
 .DS_Store
 
 .vercel

@@ -3,6 +3,7 @@ import { configureGbaCamera } from '../display';
 import { audio } from '../audio';
 import { controls } from '../controls';
 import { gameStore } from '../state';
+import { isLoggedIn } from '../liveNetwork';
 import { button, COLORS, label, panel, textStyle } from '../ui';
 
 export class TitleScene extends Phaser.Scene {
@@ -36,7 +37,7 @@ export class TitleScene extends Phaser.Scene {
   private refresh() { this.options.forEach((entry,index) => entry.setSelected(index===this.selected)); }
   private choose(index: number) {
     audio.unlock(); audio.sfx('confirm'); audio.playMusic(this,'village');
-    if (gameStore.hasSave() && index===0) { gameStore.continueGame(); this.scene.start('Overworld'); }
+    if (gameStore.hasSave() && index===0) { gameStore.continueGame(); this.scene.start('Overworld', { promptLogin: !isLoggedIn() }); }
     else this.scene.start('Intro');
   }
 }

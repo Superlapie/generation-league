@@ -94,11 +94,11 @@ export class OverworldScene extends Phaser.Scene {
     const worldId = localStorage.getItem('generation-league:world:v1') || 'mossmere';
     this.network.connect(worldSocketUrl(), { displayName: gameStore.save?.player.name ?? auth.displayName ?? 'Guest', guest: !this.networkToken, worldId, token: this.networkToken || undefined });
     this.networkOff = this.network.onMessage((message) => {
+      if (message.type === 'hello:ack') this.network.send('presence:update', { mapId: this.map.id, x: this.position.x, y: this.position.y });
       if (message.type === 'presence:list') { this.onlinePlayers.clear(); message.payload.players.forEach((player) => this.onlinePlayers.set(player.accountId, player)); this.syncRemotePlayers(); }
       if (message.type === 'presence:changed') { if (message.payload.online) this.onlinePlayers.set(message.payload.player.accountId, message.payload.player); else this.onlinePlayers.delete(message.payload.player.accountId); this.syncRemotePlayers(); }
       if (message.type === 'chat:message' && (message.payload.channel === 'world' || message.payload.channel === 'local')) { this.chatMessages = [...this.chatMessages, message.payload].slice(-20); this.refreshChatOverlay(); }
     });
-    this.network.send('presence:update', { mapId: this.map.id, x: this.position.x, y: this.position.y });
   }
   private syncRemotePlayers() {
     const ownId = this.readAuth().accountId;

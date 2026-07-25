@@ -18,7 +18,7 @@ class Controls {
     this.ready = true;
     window.addEventListener('keydown', (event) => {
       const target = event.target as HTMLElement | null;
-      if (target?.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return;
+      if (target && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))) return;
       const key = keyMap[event.code];
       if (!key) return;
       if (!this.held.has(key)) { this.fresh.add(key); this.bufferDirection(key); }

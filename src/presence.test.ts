@@ -32,6 +32,6 @@ describe('presence visibility', () => {
       ['acct-nearby', player({ accountId: 'acct-nearby', x: 11, y: 10 })],
       ['acct-away', player({ accountId: 'acct-away', mapId: 'research-lodge' })],
     ]);
-    expect([...visibleRemotePlayerIds(onlinePlayers, 'acct-self', 'mossmere')]).toEqual(['acct-nearby']);
+    expect([...visibleRemotePlayerIds(onlinePlayers, 'acct-self', { mapId: 'mossmere', x: 10, y: 10 })]).toEqual(['acct-nearby']);
   });
 });

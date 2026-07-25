@@ -7,24 +7,57 @@
     <title>Generation League</title>
   </head>
   <body>
-    <main id="shell">
-      <section id="game-frame" aria-label="Generation League game">
-        <div id="game"></div>
-        <div id="touch-controls" aria-label="Touch controls">
-          <div class="dpad" aria-label="Directional pad">
-            <button data-key="UP" aria-label="Up">▲</button>
-            <button data-key="LEFT" aria-label="Left">◀</button>
-            <button data-key="RIGHT" aria-label="Right">▶</button>
-            <button data-key="DOWN" aria-label="Down">▼</button>
-          </div>
-          <button class="touch-menu" data-key="MENU">MENU</button>
-          <div class="action-pad">
-            <button class="b" data-key="B">B</button>
-            <button class="a" data-key="A">A</button>
+    <main id="app-shell">
+      <header class="app-header">
+        <div class="app-brand">
+          <span class="app-mark" aria-hidden="true">GL</span>
+          <div>
+            <p class="app-kicker">Generation League</p>
+            <strong data-header-location>FIELD</strong>
           </div>
         </div>
-      </section>
-      <footer><strong>GENERATION LEAGUE</strong><span>ENTER / Z: confirm · X: back · SHIFT: run</span></footer>
+        <div class="app-header-meta">
+          <span class="ll-conn-dot is-offline" data-header-connection aria-label="Connection status"></span>
+          <span class="app-world" data-header-world>mossmere</span>
+          <button type="button" class="ll-icon-btn app-sidebar-toggle" data-ll-toggle aria-label="Toggle League Link">☰</button>
+        </div>
+      </header>
+
+      <div class="play-layout">
+        <section id="game-column">
+          <section id="game-frame" aria-label="Generation League game">
+            <div id="game-shell">
+              <div id="game">
+                <div id="touch-controls" aria-label="Touch controls">
+                  <div class="dpad" aria-label="Directional pad">
+                    <button data-key="UP" aria-label="Up">▲</button>
+                    <button data-key="LEFT" aria-label="Left">◀</button>
+                    <button data-key="RIGHT" aria-label="Right">▶</button>
+                    <button data-key="DOWN" aria-label="Down">▼</button>
+                  </div>
+                  <button class="touch-menu" data-key="MENU">MENU</button>
+                  <div class="action-pad">
+                    <button class="b" data-key="B">B</button>
+                    <button class="a" data-key="A">A</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <button type="button" class="ll-launcher" data-ll-launcher aria-label="Open League Link">
+              League Link
+              <span data-ll-launcher-badge hidden>0</span>
+            </button>
+          </section>
+
+          <footer class="game-footer">
+            <strong>GENERATION LEAGUE</strong>
+            <span data-footer-status>Offline</span>
+            <span class="game-footer-hint">ENTER / Z: confirm · X: back · SHIFT: run</span>
+          </footer>
+        </section>
+
+        <aside id="league-link" class="league-link" aria-label="League Link online interface"></aside>
+      </div>
     </main>
     <script type="module" src="/src/main.ts"></script>
   </body>

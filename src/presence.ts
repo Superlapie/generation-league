@@ -16,12 +16,12 @@ export function canSeePlayer(
 export function visibleRemotePlayerIds(
   onlinePlayers: Iterable<[string, PresenceRecord]>,
   ownId: string | undefined,
-  mapId: string,
+  observer: Pick<PresenceRecord, 'mapId' | 'x' | 'y'>,
 ): Set<string> {
   const visible = new Set<string>();
   for (const [accountId, player] of onlinePlayers) {
-    if (accountId === ownId || player.mapId !== mapId) continue;
-    visible.add(accountId);
+    if (accountId === ownId) continue;
+    if (canSeePlayer(observer, player)) visible.add(accountId);
   }
   return visible;
 }

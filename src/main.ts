@@ -10,8 +10,11 @@ import { DoubleBattleScene } from './scenes/DoubleBattleScene';
 import { MenuScene } from './scenes/MenuScene';
 import { CreditsScene } from './scenes/CreditsScene';
 import { gameStore } from './state';
+import { initGameScale } from './online/gameScale';
+import { initLeagueLink } from './online/LeagueLink';
 
 controls.init();
+initLeagueLink();
 
 const game = new Phaser.Game({
   type: Phaser.AUTO,
@@ -24,17 +27,33 @@ const game = new Phaser.Game({
   antialias: false,
   antialiasGL: false,
   render: { roundPixels: true, antialias: false, antialiasGL: false },
-  scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH, width: 480, height: 320 },
+  scale: { mode: Phaser.Scale.NONE, autoCenter: Phaser.Scale.NO_CENTER, width: 480, height: 320 },
   input: { keyboard: false, mouse: true, touch: true },
   audio: { disableWebAudio: false },
   dom: { createContainer: true },
-  scene: [BootScene,TitleScene,IntroScene,OverworldScene,BattleScene,DoubleBattleScene,MenuScene,CreditsScene],
+  scene: [BootScene, TitleScene, IntroScene, OverworldScene, BattleScene, DoubleBattleScene, MenuScene, CreditsScene],
 });
 
-window.addEventListener('beforeunload',()=>{
-  const scene=game.scene.getScene('Overworld');
-  if(scene?.scene.isActive()) gameStore.autoSave();
+const gameFrame = document.getElementById('game-frame');
+let gameScaleReady = false;
+
+const bootGameScale = () => {
+  if (!gameFrame || !game.canvas) {
+    requestAnimationFrame(bootGameScale);
+    return;
+  }
+  if (gameScaleReady) return;
+  gameScaleReady = true;
+  initGameScale(gameFrame, game);
+};
+
+bootGameScale();
+window.addEventListener('load', bootGameScale, { once: true });
+
+window.addEventListener('beforeunload', () => {
+  const scene = game.scene.getScene('Overworld');
+  if (scene?.scene.isActive()) gameStore.autoSave();
 });
 
 declare global { interface Window { __GENERATION_LEAGUE__?: Phaser.Game } }
-window.__GENERATION_LEAGUE__=game;
+window.__GENERATION_LEAGUE__ = game;

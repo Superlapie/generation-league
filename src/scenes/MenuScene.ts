@@ -9,23 +9,22 @@ import { gameStore } from '../state';
 import type { CreatureInstance, GameOptions, ItemDefinition } from '../types';
 import { applyCloudProfile, toCloudProfile } from '../cloudProfile';
 import { configureAuthOverlay, hideAuthOverlay, setAuthOverlayStatus, showAuthOverlay } from '../authOverlay';
-import { canAttemptLiveConnection, connectLiveWorldSession, liveNetwork, switchWorldSession } from '../liveNetwork';
-import type { ChatMessage, FriendRecord, PlayerCard, PresenceRecord, TradeListing, WorldDirectoryEntry } from '../types';
+import { canAttemptLiveConnection, connectLiveWorldSession, liveNetwork } from '../liveNetwork';
+import { openLeagueLink } from '../online/LeagueLink';
 import { COLORS, hpColor, label, panel, textStyle } from '../ui';
 
 type MenuMode = 'pause' | 'shop';
-type Page = 'root' | 'party' | 'summary' | 'bag' | 'guide' | 'card' | 'options' | 'shop' | 'worlds' | 'social' | 'account';
+type Page = 'root' | 'party' | 'summary' | 'bag' | 'guide' | 'card' | 'options' | 'shop' | 'account';
 type Pocket = ItemDefinition['category'];
 type BagMode = 'browse' | 'actions' | 'quantity' | 'target';
 
-const ROOT = ['CREATURES', 'BAG', 'FIELD GUIDE', 'PLAYER CARD', 'ONLINE WORLDS', 'SOCIAL HUB', 'ACCOUNT', 'SAVE', 'OPTIONS', 'CLOSE'];
+const ROOT = ['CREATURES', 'BAG', 'FIELD GUIDE', 'PLAYER CARD', 'LEAGUE LINK', 'ACCOUNT', 'SAVE', 'OPTIONS', 'CLOSE'];
 const ROOT_HELP: Record<string, string> = {
   CREATURES: 'Review, switch, store, and equip your team.',
   BAG: 'Use medicine, Pods, held items, and key gear.',
   'FIELD GUIDE': 'Review every creature you have seen or caught.',
   'PLAYER CARD': 'View your journey record and earned Crests.',
-  'ONLINE WORLDS': 'See live world population and connect to another shard.',
-  'SOCIAL HUB': 'Inspect nearby players, friends, messages, and trade listings.',
+  'LEAGUE LINK': 'World shards, chat, nearby players, friends, and trades.',
   ACCOUNT: 'Link a durable cloud identity and protect your progression.',
   SAVE: 'Write a protected manual save and backup.',
   OPTIONS: 'Tune battle presentation and audio.',
@@ -64,22 +63,10 @@ export class MenuScene extends Phaser.Scene {
   private bagQuantity = 1;
   private shopBuying = false;
   private shopQuantity = 1;
-  private worlds: WorldDirectoryEntry[] = [];
-  private worldStatus = 'CONNECT TO THE LIVE REGION';
-  private players: PresenceRecord[] = [];
-  private messages: ChatMessage[] = [];
-  private friendRecords: FriendRecord[] = [];
-  private tradeListings: TradeListing[] = [];
-  private selectedCard: PlayerCard | null = null;
-  private socialTab = 0;
   private accountId = '';
   private authToken = '';
   private authStatus = 'GUEST SESSION: LINK AN ACCOUNT TO SYNC PROGRESS';
   private connectedWorldId = 'mossmere';
-  private socialChatDom: Phaser.GameObjects.DOMElement | null = null;
-  private socialChatSubmitting = false;
-  private socialMessageObjects: Phaser.GameObjects.Text[] = [];
-  private networkOff?: () => void;
 
   constructor() { super('Menu'); }
 
@@ -107,28 +94,6 @@ export class MenuScene extends Phaser.Scene {
     configureGbaCamera(this);
     this.cameras.main.setBackgroundColor('#172219');
     controls.clear();
-    this.networkOff?.();
-    this.networkOff = liveNetwork.onMessage((message) => {
-      if (message.type === 'worlds:list') { this.worlds = message.payload.worlds; this.worldStatus = 'LIVE WORLD DIRECTORY'; if (this.page === 'worlds') this.render(); }
-      if (message.type === 'pong' && this.page === 'worlds') this.render();
-      if (message.type === 'hello:ack') { this.accountId = message.payload.accountId; this.connectedWorldId = message.payload.worldId; this.authStatus = this.accountId.startsWith('guest-') ? 'GUEST SESSION: PROGRESS IS LOCAL' : 'CLOUD PROFILE CONNECTED'; this.worldStatus = `CONNECTED TO ${message.payload.worldId.toUpperCase()}`; if (!this.accountId.startsWith('guest-')) liveNetwork.send('profile:get', {}); this.render(); }
-      if (message.type === 'auth:ack') { this.accountId = message.payload.accountId; this.authToken = message.payload.token; this.authStatus = `SIGNED IN AS ${message.payload.displayName.toUpperCase()}`; localStorage.setItem('generation-league:auth:v1', JSON.stringify({ accountId: this.accountId, token: this.authToken, displayName: message.payload.displayName })); liveNetwork.send('profile:get', {}); this.worldStatus = 'ACCOUNT LINKED TO CLOUD PROFILE'; this.render(); }
-      if (message.type === 'profile:ack') { const profile = message.payload.profile as { schemaVersion?: number }; if (profile.schemaVersion === 2 && gameStore.save) { try { gameStore.save = applyCloudProfile(gameStore.save, message.payload.profile as Parameters<typeof applyCloudProfile>[1]); gameStore.manualSave(); this.authStatus = 'CLOUD PROFILE RESTORED TO THIS DEVICE'; } catch { this.authStatus = 'CLOUD PROFILE FAILED VALIDATION'; } } else if (gameStore.save && this.accountId) { this.uploadCloudProfile(); this.authStatus = 'LOCAL PROGRESS UPLOADED TO CLOUD'; } if (this.page === 'account') this.close(); else this.render(); }
-      if (message.type === 'presence:list') { this.players = message.payload.players; if (this.page === 'social') this.render(); }
-      if (message.type === 'presence:changed') { this.players = this.players.filter((player) => player.accountId !== message.payload.player.accountId); if (message.payload.online) this.players.push(message.payload.player); if (this.page === 'social') this.render(); }
-      if (message.type === 'chat:message') { this.messages = [...this.messages, message.payload].slice(-20); if (this.page === 'social' && this.socialTab === 1) this.renderSocialChatMessages(); }
-      if (message.type === 'friend:changed') { this.friendRecords = [...this.friendRecords.filter((friend) => friend.accountId !== message.payload.accountId), message.payload]; if (this.page === 'social') this.render(); }
-      if (message.type === 'player:card') { this.selectedCard = message.payload; this.note = `${message.payload.displayName.toUpperCase()} PLAYER CARD`; if (this.page === 'social') this.render(); }
-      if (message.type === 'trade:changed' && message.payload.listing) { this.tradeListings = [...this.tradeListings.filter((listing) => listing.id !== message.payload.listing!.id), message.payload.listing]; if (this.page === 'social') this.render(); }
-      if (message.type === 'error') {
-        if (this.page === 'account') {
-          this.authStatus = message.payload.message.toUpperCase();
-          setAuthOverlayStatus(this.authStatus);
-        }
-        this.worldStatus = message.payload.message.toUpperCase();
-        this.render();
-      }
-    });
     if (this.page === 'account') this.connectDefaultWorld();
     this.render();
   }
@@ -185,7 +150,6 @@ export class MenuScene extends Phaser.Scene {
       return;
     }
     if (this.page === 'options') this.adjustOption(amount);
-    if (this.page === 'social') { this.socialTab = (this.socialTab + amount + 4) % 4; this.cursor = 0; this.selectedCard = null; audio.sfx('confirm'); this.render(); }
   }
 
   private clear() {
@@ -199,11 +163,6 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private render() {
-    if (this.page !== 'social') {
-      this.socialChatDom?.setVisible(false);
-      this.socialMessageObjects.forEach((object) => object.destroy());
-      this.socialMessageObjects = [];
-    }
     this.clear();
     const bg = this.keep(this.add.graphics());
     bg.fillStyle(0x14221d, 1).fillRect(0, 0, 240, 160);
@@ -215,8 +174,6 @@ export class MenuScene extends Phaser.Scene {
     else if (this.page === 'guide') this.renderGuide();
     else if (this.page === 'card') this.renderCard();
     else if (this.page === 'options') this.renderOptions();
-    else if (this.page === 'worlds') this.renderWorlds();
-    else if (this.page === 'social') this.renderSocial();
     else if (this.page === 'account') this.renderAccount();
     else this.renderShop();
   }
@@ -259,29 +216,6 @@ export class MenuScene extends Phaser.Scene {
     this.keep(label(this, 13, 143, this.note || ROOT_HELP[ROOT[this.cursor]], 6, '#30433a', 3));
   }
 
-  private renderWorlds() {
-    this.header('ONLINE WORLDS', liveNetwork.latencyMs === null ? 'PING --' : `PING ${liveNetwork.latencyMs}ms`);
-    this.box(8, 27, 224, 28, 0xe4e9cf);
-    this.keep(label(this, 16, 34, 'THREE SHARED POPULATION SHARDS', 7, '#20342f', 3));
-    this.keep(label(this, 16, 45, this.worldStatus, 6, '#52665c', 3));
-    const rows = this.worlds.length ? this.worlds : [
-      { id: 'mossmere', name: 'World 1', players: 0, capacity: 2000, pingMs: null, healthy: false },
-      { id: 'cinderstep', name: 'World 2', players: 0, capacity: 2000, pingMs: null, healthy: false },
-      { id: 'tideglass', name: 'World 3', players: 0, capacity: 2000, pingMs: null, healthy: false },
-    ];
-    this.rows = rows.map((world) => world.id);
-    rows.forEach((world, index) => {
-      const selected = index === this.cursor;
-      const y = 62 + index * 21;
-      const bg = this.keep(this.add.rectangle(12, y, 216, 18, selected ? 0x5b8f94 : 0x2c4543).setOrigin(0).setDepth(2).setInteractive());
-      this.keep(label(this, 19, y + 4, `${selected ? '> ' : ''}${world.name}`, 8, selected ? '#ffffff' : '#dbe5cf', 4));
-      this.keep(label(this, 224, y + 4, `${world.players}/${world.capacity} ${world.healthy ? 'ONLINE' : 'OFFLINE'}`, 6, selected ? '#ffffff' : '#b7c8b0', 4)).setOrigin(1, 0);
-      bg.on('pointerdown', () => { this.cursor = index; this.choose(); });
-    });
-    this.box(8, 131, 224, 24, 0xe8edcf);
-    this.keep(label(this, 16, 138, 'A: CONNECT   B: BACK', 7, '#30433a', 3));
-  }
-
   private renderAccount() {
     this.header('CLOUD ACCOUNT', this.accountId && !this.accountId.startsWith('guest-') ? 'LINKED' : 'GUEST');
     this.box(8, 27, 224, 118, 0xe4e9cf);
@@ -303,99 +237,6 @@ export class MenuScene extends Phaser.Scene {
     const status = this.authStatus.startsWith('GUEST SESSION') ? 'GUEST SAVE: LOCAL ONLY' : this.authStatus;
     showAuthOverlay({ gate: false, status });
   }
-
-  private renderSocial() {
-    this.header('SOCIAL HUB', `${this.players.length} NEARBY`);
-    const tabs = ['PLAYERS', 'CHAT', 'FRIENDS', 'TRADES'];
-    tabs.forEach((tab, index) => {
-      const x = 8 + index * 58;
-      const selected = index === this.socialTab;
-      this.keep(this.add.rectangle(x, 27, 54, 13, selected ? 0x638f91 : 0x2c4543).setOrigin(0).setDepth(2));
-      this.keep(label(this, x + 27, 30, tab, 6, selected ? '#fff' : '#b9c8ac', 3)).setOrigin(.5, 0);
-    });
-    this.box(8, 45, 224, 87, 0xe4e9cf);
-    if (this.socialTab === 0) this.renderSocialPlayers();
-    else if (this.socialTab === 1) this.renderSocialChat();
-    else if (this.socialTab === 2) this.renderSocialFriends();
-    else this.renderSocialTrades();
-    if (this.socialTab !== 1) this.socialChatDom?.setVisible(false);
-    if (this.selectedCard) {
-      this.keep(this.add.rectangle(22, 54, 196, 68, 0x182c2c, .96).setDepth(6));
-      this.keep(label(this, 32, 62, this.selectedCard.displayName.toUpperCase(), 9, '#f1f1d0', 7));
-      this.keep(label(this, 32, 78, `CRESTS ${this.selectedCard.crests.length}   CAUGHT ${this.selectedCard.caughtCount}`, 6, '#d7ddb8', 7));
-      this.keep(label(this, 32, 92, `PLAY TIME ${Math.floor(this.selectedCard.playTimeSeconds / 3600)}H`, 6, '#d7ddb8', 7));
-      this.keep(label(this, 32, 108, 'A: ADD FRIEND   B: CLOSE CARD', 6, '#f6d36b', 7));
-    }
-    this.keep(label(this, 14, 141, this.note || 'L/R: TAB   A: SELECT   B: BACK', 6, '#c9d8bd', 3));
-  }
-
-  private renderSocialPlayers() {
-    const rows = this.players.filter((player) => player.accountId !== this.currentAccountId()).slice(0, 5);
-    this.rows = rows.map((player) => player.accountId);
-    if (!rows.length) { this.keep(label(this, 120, 83, 'NO OTHER PLAYERS FOUND', 7, '#52665c', 3)).setOrigin(.5); return; }
-    rows.forEach((player, index) => { const selected = index === this.cursor; const y = 52 + index * 15; this.keep(this.add.rectangle(14, y, 212, 13, selected ? 0x638f91 : 0x2c4543).setOrigin(0).setDepth(2)); this.keep(label(this, 20, y + 3, `${selected ? '> ' : ''}${player.displayName}`, 7, selected ? '#fff' : '#dbe5cf', 3)); this.keep(label(this, 216, y + 3, `${player.mapId.toUpperCase()} ${player.x},${player.y}`, 5, selected ? '#fff' : '#b9c8ac', 3)).setOrigin(1, 0); });
-  }
-
-  private renderSocialChat() {
-    this.rows = [];
-    this.renderSocialChatMessages();
-    this.ensureSocialChatDom();
-  }
-
-  private renderSocialChatMessages() {
-    const messages = this.messages.slice(-5);
-    this.socialMessageObjects.forEach((object) => object.destroy());
-    this.socialMessageObjects = [];
-    if (!messages.length) {
-      const empty = label(this, 120, 68, 'NO MESSAGES YET', 7, '#52665c', 3);
-      empty.setOrigin(.5);
-      this.socialMessageObjects.push(empty);
-      return;
-    }
-    messages.forEach((message, index) => {
-      this.socialMessageObjects.push(label(this, 16, 53 + index * 12, `${message.from.slice(0, 8)}: ${message.body}`, 6, '#263a32', 3));
-    });
-  }
-
-  private ensureSocialChatDom() {
-    if (!this.socialChatDom) {
-      this.socialChatDom = this.add.dom(172, 124).createFromHTML('<form id="social-chat-form" class="chat-form"><input name="body" maxlength="240" placeholder="MESSAGE WORLD" autocomplete="off"><button type="submit">SEND</button></form>').setDepth(5);
-      const form = this.socialChatDom.getChildByID('social-chat-form') as HTMLFormElement | null;
-      form?.addEventListener('submit', (event) => {
-        event.preventDefault();
-        if (this.socialChatSubmitting || !form) return;
-        const values = new FormData(form);
-        const body = String(values.get('body') ?? '').trim();
-        if (!body) return;
-        this.socialChatSubmitting = true;
-        const submitButton = form.querySelector('button[type="submit"]') as HTMLButtonElement | null;
-        if (submitButton) submitButton.disabled = true;
-        liveNetwork.send('chat:send', { channel: 'world', body });
-        form.reset();
-        this.note = 'MESSAGE SENT';
-        requestAnimationFrame(() => {
-          this.socialChatSubmitting = false;
-          if (submitButton) submitButton.disabled = false;
-        });
-      });
-    }
-    this.socialChatDom.setVisible(this.page === 'social' && this.socialTab === 1);
-  }
-
-  private renderSocialFriends() {
-    this.rows = this.friendRecords.map((friend) => friend.accountId);
-    if (!this.friendRecords.length) { this.keep(label(this, 120, 78, 'NO FRIENDS YET', 7, '#52665c', 3)).setOrigin(.5); return; }
-    this.friendRecords.slice(0, 5).forEach((friend, index) => { const selected = index === this.cursor; const y = 52 + index * 15; this.keep(label(this, 18, y + 3, `${selected ? '> ' : ''}${friend.displayName}`, 7, selected ? '#20342f' : '#52665c', 3)); this.keep(label(this, 216, y + 3, friend.status.toUpperCase(), 6, selected ? '#7b6843' : '#8b927e', 3)).setOrigin(1, 0); });
-  }
-
-  private renderSocialTrades() {
-    this.rows = this.tradeListings.filter((listing) => listing.status === 'open').map((listing) => listing.id);
-    const listings = this.tradeListings.filter((listing) => listing.status === 'open').slice(0, 5);
-    if (!listings.length) { this.keep(label(this, 120, 78, 'NO ACTIVE TRADE LISTINGS', 7, '#52665c', 3)).setOrigin(.5); return; }
-    listings.forEach((listing, index) => { const selected = index === this.cursor; const y = 52 + index * 15; this.keep(label(this, 18, y + 3, `${selected ? '> ' : ''}${listing.offeredSpeciesId.toUpperCase()} Lv${listing.offeredLevel}`, 7, selected ? '#20342f' : '#52665c', 3)); this.keep(label(this, 216, y + 3, listing.requestedSpeciesId?.toUpperCase() ?? 'ANY', 6, selected ? '#7b6843' : '#8b927e', 3)).setOrigin(1, 0); });
-  }
-
-  private currentAccountId() { return this.accountId; }
 
   private uploadCloudProfile() {
     if (!gameStore.save || !this.accountId || this.accountId.startsWith('guest-')) return false;
@@ -683,34 +524,20 @@ export class MenuScene extends Phaser.Scene {
 
   private choose() {
     audio.sfx('confirm'); const save = gameStore.save!;
-    if (this.page === 'root') { const pick = ROOT[this.cursor]; if (pick === 'CREATURES') this.open('party'); else if (pick === 'BAG') this.open('bag'); else if (pick === 'FIELD GUIDE') this.open('guide'); else if (pick === 'PLAYER CARD') this.open('card'); else if (pick === 'ONLINE WORLDS') { this.connectDefaultWorld(); this.open('worlds'); } else if (pick === 'SOCIAL HUB') { this.connectDefaultWorld(); this.open('social'); } else if (pick === 'ACCOUNT') { this.connectDefaultWorld(); this.open('account'); } else if (pick === 'OPTIONS') this.open('options'); else if (pick === 'SAVE') { this.note = gameStore.manualSave() ? 'Game saved safely.' : 'Save failed.'; this.render(); } else this.close(); return; }
-    if (this.page === 'worlds') {
-      const world = this.worlds[this.cursor];
-      if (!world) { this.worldStatus = 'LIVE SERVER NOT FOUND'; this.render(); return; }
-      const save = gameStore.save;
-      if (!save) return;
-      const stored = this.authToken || (() => { try { return JSON.parse(localStorage.getItem('generation-league:auth:v1') ?? '{}').token ?? ''; } catch { return ''; } })();
-      this.authToken = stored;
-      switchWorldSession(world.id, save.location.mapId, save.location.x, save.location.y);
-      this.worldStatus = `CONNECTING TO ${world.name.toUpperCase()}`;
-      this.render();
+    if (this.page === 'root') {
+      const pick = ROOT[this.cursor];
+      if (pick === 'CREATURES') this.open('party');
+      else if (pick === 'BAG') this.open('bag');
+      else if (pick === 'FIELD GUIDE') this.open('guide');
+      else if (pick === 'PLAYER CARD') this.open('card');
+      else if (pick === 'LEAGUE LINK') { this.connectDefaultWorld(); openLeagueLink(); this.close(); }
+      else if (pick === 'ACCOUNT') { this.connectDefaultWorld(); this.open('account'); }
+      else if (pick === 'OPTIONS') this.open('options');
+      else if (pick === 'SAVE') { this.note = gameStore.manualSave() ? 'Game saved safely.' : 'Save failed.'; this.render(); }
+      else this.close();
       return;
     }
     if (this.page === 'account') { this.note = 'USE THE ACCOUNT FORM TO CONTINUE.'; this.render(); return; }
-    if (this.page === 'social') {
-      if (this.selectedCard) { liveNetwork.send('friend:request', { accountId: this.selectedCard.accountId }); this.note = `FRIEND REQUEST SENT TO ${this.selectedCard.displayName.toUpperCase()}`; this.selectedCard = null; this.render(); return; }
-      if (this.socialTab === 0 && this.rows[this.cursor]) { liveNetwork.send('player:inspect', { accountId: this.rows[this.cursor] }); this.note = 'LOADING PLAYER CARD'; this.render(); }
-      if (this.socialTab === 2 && this.rows[this.cursor]) { const friend = this.friendRecords.find((entry) => entry.accountId === this.rows[this.cursor]); if (friend?.status === 'pending') { liveNetwork.send('friend:respond', { accountId: friend.accountId, accept: true }); this.note = `FRIEND REQUEST ACCEPTED: ${friend.displayName.toUpperCase()}`; this.render(); } }
-      if (this.socialTab === 3 && this.rows[this.cursor]) {
-        const listing = this.tradeListings.find((entry) => entry.id === this.rows[this.cursor]);
-        const creature = save.party[0];
-        if (!listing || !creature) this.note = 'YOU NEED A PARTY CREATURE TO ACCEPT A TRADE.';
-        else if (!this.accountId || this.accountId.startsWith('guest-')) this.note = 'LINK A CLOUD ACCOUNT BEFORE TRADING.';
-        else { this.uploadCloudProfile(); liveNetwork.send('trade:accept', { listingId: listing.id, creatureUid: creature.uid }); this.note = 'TRADE CONFIRMATION SENT.'; }
-        this.render();
-      }
-      return;
-    }
     if (this.page === 'party') {
       const source = this.storage ? save.storage : save.party;
       if(!this.partyAction&&this.storageSwapIndex!==null){
@@ -738,13 +565,10 @@ export class MenuScene extends Phaser.Scene {
           this.pocket = POCKETS.findIndex((entry) => entry.id === 'held'); this.bagMode = 'browse'; this.render();
         }
       } else if (this.cursor === 3) {
-        if (!this.accountId || this.accountId.startsWith('guest-')) this.note = 'LINK A CLOUD ACCOUNT BEFORE TRADING.';
-        else {
-          this.uploadCloudProfile();
-          liveNetwork.send('trade:create', { offeredCreatureUid: creature.uid, offeredSpeciesId: creature.speciesId, offeredLevel: creature.level, expiresAt: Date.now() + 86_400_000 });
-          this.note = `${(creature.nickname || SPECIES[creature.speciesId].name).toUpperCase()} LISTED FOR TRADE.`;
-        }
-        this.partyAction = false; this.cursor = this.partyIndex; this.render();
+        this.partyAction = false;
+        this.cursor = this.partyIndex;
+        openLeagueLink('trade');
+        this.close();
       } else { this.partyAction = false; this.cursor = this.partyIndex; this.render(); }
       return;
     }
@@ -813,10 +637,7 @@ export class MenuScene extends Phaser.Scene {
     audio.sfx('cancel');
     if (this.page === 'shop' && this.shopBuying) { this.shopBuying=false;this.shopQuantity=1;this.note='';this.render(); }
     else if (this.page === 'root' || this.page === 'shop') this.close();
-    else if (this.page === 'worlds') this.open('root');
     else if (this.page === 'account') this.open('root');
-    else if (this.page === 'social' && this.selectedCard) { this.selectedCard = null; this.note = ''; this.render(); }
-    else if (this.page === 'social') this.open('root');
     else if (this.page === 'party' && this.storageSwapIndex!==null) { this.storageSwapIndex=null;this.storage=true;this.cursor=this.partyIndex;this.note='';this.render(); }
     else if (this.page === 'party' && this.partyAction) { this.partyAction = false; this.cursor = this.partyIndex; this.render(); }
     else if (this.page === 'summary') { this.open('party'); this.cursor = this.partyIndex; this.render(); }
@@ -827,12 +648,6 @@ export class MenuScene extends Phaser.Scene {
     else this.open('root');
   }
   private close() {
-    this.networkOff?.();
-    this.networkOff = undefined;
-    this.socialChatDom?.destroy();
-    this.socialChatDom = null;
-    this.socialMessageObjects.forEach((object) => object.destroy());
-    this.socialMessageObjects = [];
     hideAuthOverlay();
     this.scene.stop();
     this.scene.resume('Overworld');

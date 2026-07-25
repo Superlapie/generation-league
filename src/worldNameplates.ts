@@ -1,5 +1,6 @@
 import type Phaser from 'phaser';
 import { OVERWORLD_CHARACTER_HEIGHT } from './display';
+import { INTERNAL_HEIGHT, INTERNAL_WIDTH } from './online/gameScale';
 
 export const OVERWORLD_NAMEPLATE_OFFSET = OVERWORLD_CHARACTER_HEIGHT + 4;
 
@@ -11,12 +12,18 @@ export type WorldNameplate = {
 
 let layer: HTMLElement | null = null;
 
+function mountElement() {
+  return document.getElementById('game-shell');
+}
+
 function ensureLayer() {
   if (layer) return layer;
+  const mount = mountElement();
+  if (!mount) throw new Error('Missing #game-frame mount for world nameplates');
   layer = document.createElement('div');
   layer.className = 'world-nameplates';
   layer.setAttribute('aria-hidden', 'true');
-  document.body.append(layer);
+  mount.append(layer);
   return layer;
 }
 
@@ -25,18 +32,40 @@ export function removeWorldNameplateLayer() {
   layer = null;
 }
 
+export function projectWorldToDisplay(
+  worldX: number,
+  worldY: number,
+  scrollX: number,
+  scrollY: number,
+  zoom: number,
+  canvasRect: Pick<DOMRect, 'left' | 'top' | 'width' | 'height'>,
+  mountRect: Pick<DOMRect, 'left' | 'top'>,
+) {
+  const screenX = (worldX - scrollX) * zoom;
+  const screenY = (worldY - scrollY) * zoom;
+  const scaleX = canvasRect.width / INTERNAL_WIDTH;
+  const scaleY = canvasRect.height / INTERNAL_HEIGHT;
+  return {
+    x: canvasRect.left - mountRect.left + screenX * scaleX,
+    y: canvasRect.top - mountRect.top + screenY * scaleY,
+  };
+}
+
 export function worldToViewport(scene: Phaser.Scene, worldX: number, worldY: number) {
   const camera = scene.cameras.main;
   const canvas = scene.game.canvas;
-  const rect = canvas.getBoundingClientRect();
-  const screenX = (worldX - camera.scrollX) * camera.zoom;
-  const screenY = (worldY - camera.scrollY) * camera.zoom;
-  const scaleX = rect.width / canvas.width;
-  const scaleY = rect.height / canvas.height;
-  return {
-    x: rect.left + screenX * scaleX,
-    y: rect.top + screenY * scaleY,
-  };
+  const mount = mountElement();
+  if (!mount) return { x: 0, y: 0 };
+
+  return projectWorldToDisplay(
+    worldX,
+    worldY,
+    camera.scrollX,
+    camera.scrollY,
+    camera.zoom,
+    canvas.getBoundingClientRect(),
+    mount.getBoundingClientRect(),
+  );
 }
 
 export function createWorldNameplate(scene: Phaser.Scene, displayName: string): WorldNameplate {
@@ -53,8 +82,8 @@ export function createWorldNameplate(scene: Phaser.Scene, displayName: string): 
 
   const reposition = () => {
     const { x, y } = worldToViewport(scene, worldX, footY - OVERWORLD_NAMEPLATE_OFFSET);
-    root.style.left = `${x}px`;
-    root.style.top = `${y}px`;
+    root.style.left = `${Math.round(x)}px`;
+    root.style.top = `${Math.round(y)}px`;
   };
 
   layout(displayName);

@@ -2,7 +2,8 @@ import Phaser from 'phaser';
 import { audio } from '../audio';
 import { controls } from '../controls';
 import { createCreature, ITEMS, SPECIES } from '../data';
-import { configureGbaCamera, configureOverworldCharacter, createOverworldNameplate, OVERWORLD_NAMEPLATE_OFFSET, overworldAvatarKey, type OverworldNameplate } from '../display';
+import { configureGbaCamera, configureOverworldCharacter, overworldAvatarKey } from '../display';
+import { createWorldNameplate, removeWorldNameplateLayer, type WorldNameplate } from '../worldNameplates';
 import { MAPS } from '../maps';
 import { gameStore } from '../state';
 import type { ChatMessage, Direction, MapDefinition, NpcDefinition, PresenceRecord, TileKind, TrainerDefinition } from '../types';
@@ -34,7 +35,7 @@ export class OverworldScene extends Phaser.Scene {
   private dialogueDone?: () => void;
   private dialogueObjects: Phaser.GameObjects.GameObject[] = [];
   private actors = new Map<string, Phaser.GameObjects.Sprite>();
-  private remoteActors = new Map<string, { sprite: Phaser.GameObjects.Sprite; nameplate: OverworldNameplate }>();
+  private remoteActors = new Map<string, { sprite: Phaser.GameObjects.Sprite; nameplate: WorldNameplate }>();
   private onlinePlayers = new Map<string, PresenceRecord>();
   private chatMessages: ChatMessage[] = [];
   private chatOverlay: HTMLElement | null = null;
@@ -76,6 +77,7 @@ export class OverworldScene extends Phaser.Scene {
     if (storedToken !== this.networkToken) this.connectLiveWorld(true);
     else if (!liveNetwork.hasLiveSocket() && canAttemptLiveConnection()) this.connectLiveWorld();
     this.updateCameraFx();
+    this.syncRemoteNameplates();
     if (this.modal) { if (controls.pressed('A')||controls.pressed('B')) this.advanceDialogue(); return; }
     if (this.moving || this.bumping || time < this.repeatAt) return;
     if (controls.pressed('MENU')) { audio.sfx('confirm'); this.scene.launch('Menu',{mode:'pause'}); this.scene.pause(); return; }
@@ -140,9 +142,8 @@ export class OverworldScene extends Phaser.Scene {
         const footY = player.y * TILE + 16;
         const sprite = applyFacing(configureOverworldCharacter(this.add.sprite(player.x * TILE + 8, footY, avatarKey, 0)), 'down').setDepth(this.worldDepth(footY) + 1);
         sprite.setData('avatar', player.avatar);
-        const nameplate = createOverworldNameplate(this, player.displayName);
+        const nameplate = createWorldNameplate(this, player.displayName);
         nameplate.setWorldPosition(sprite.x, footY);
-        nameplate.setDepth(this.worldDepth(footY) + 2);
         actor = { sprite, nameplate };
         this.remoteActors.set(accountId, actor);
       }
@@ -155,10 +156,8 @@ export class OverworldScene extends Phaser.Scene {
         actor.sprite.setData('avatar', player.avatar);
       }
       this.tweens.add({ targets: actor.sprite, x, y, duration: 180, ease: 'Linear' });
-      this.tweens.add({ targets: actor.nameplate.root, x, y: y - OVERWORLD_NAMEPLATE_OFFSET, duration: 180, ease: 'Linear' });
       actor.nameplate.setDisplayName(player.displayName);
       actor.sprite.setDepth(this.worldDepth(y) + 1);
-      actor.nameplate.setDepth(this.worldDepth(y) + 2);
     });
     for (const [accountId, actor] of this.remoteActors) {
       if (!visible.has(accountId)) {
@@ -166,6 +165,11 @@ export class OverworldScene extends Phaser.Scene {
         actor.nameplate.destroy();
         this.remoteActors.delete(accountId);
       }
+    }
+  }
+  private syncRemoteNameplates() {
+    for (const { sprite, nameplate } of this.remoteActors.values()) {
+      nameplate.setWorldPosition(sprite.x, sprite.y);
     }
   }
   private createChatOverlay() {
@@ -374,6 +378,7 @@ export class OverworldScene extends Phaser.Scene {
     this.chatOverlay = null;
     this.remoteActors.forEach(({ sprite, nameplate }) => { sprite.destroy(); nameplate.destroy(); });
     this.remoteActors.clear();
+    removeWorldNameplateLayer();
   }
   private passable(x:number,y:number) {
     const tile=this.map.tiles[y]?.[x];if(!tile||BLOCKED.has(tile))return false;

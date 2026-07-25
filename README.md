@@ -91,7 +91,7 @@ Key client modules:
 - `src/liveNetwork.ts` — singleton WebSocket session and reconnect backoff
 - `src/presence.ts` — client-side visibility radius helpers
 - `src/authOverlay.ts` — shared title/menu account UI
-- `src/display.ts` — GBA camera, character scale, remote nameplates
+- `src/worldNameplates.ts` — DOM nameplates tracked in screen space (crisp over pixel art)
 
 ## Environment variables
 

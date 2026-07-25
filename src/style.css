@@ -54,6 +54,24 @@ button:focus-visible { outline: 2px solid #e2c15d; outline-offset: 3px; }
 .auth-note { margin: -4px 0 0; color: #718477; font-size: 11px; line-height: 1.4; }
 .auth-guest { width: 100%; min-height: 42px; margin-top: 4px; border: 1px solid #668276; color: #d8d968; background: transparent; font-size: 10px; font-weight: 800; letter-spacing: .08em; cursor: pointer; }
 .auth-guest:hover, .auth-guest:focus-visible { color: #13221b; background: #d8d968; border-color: #d8d968; }
+.world-nameplates { position: fixed; inset: 0; z-index: 90; pointer-events: none; overflow: hidden; }
+.world-nameplate {
+  position: fixed;
+  transform: translate(-50%, -100%);
+  max-width: 120px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  border: 1px solid rgba(86, 112, 102, 0.55);
+  background: rgba(10, 18, 14, 0.78);
+  color: #d4e0c8;
+  font: 600 10px/1.25 "Segoe UI", Arial, sans-serif;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.45);
+  -webkit-font-smoothing: antialiased;
+}
 .world-chat { position: fixed; z-index: 100; left: max(14px, env(safe-area-inset-left)); bottom: max(14px, env(safe-area-inset-bottom)); width: min(310px, calc(100vw - 28px)); border: 1px solid #60786b; color: #eaf0dc; background: #101914e8; box-shadow: 8px 8px 0 #08100bcc; backdrop-filter: blur(12px); font-family: "Segoe UI", Arial, sans-serif; }
 .world-chat.is-collapsed .world-chat-feed, .world-chat.is-collapsed form { display: none; }
 .world-chat-head { display: flex; justify-content: space-between; align-items: center; min-height: 32px; padding: 0 10px; border-bottom: 1px solid #30483b; color: #d8d968; font-size: 10px; font-weight: 900; letter-spacing: .12em; }

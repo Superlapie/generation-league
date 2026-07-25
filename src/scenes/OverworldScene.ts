@@ -92,7 +92,7 @@ export class OverworldScene extends Phaser.Scene {
     this.networkToken = auth.token ?? '';
     this.networkOff?.();
     const worldId = localStorage.getItem('generation-league:world:v1') || 'mossmere';
-    this.network.connect(worldSocketUrl(), { displayName: gameStore.save?.player.name ?? auth.displayName ?? 'Guest', guest: !this.networkToken, worldId, token: this.networkToken || undefined });
+    this.network.connect(worldSocketUrl(), { displayName: gameStore.save?.player.name ?? auth.displayName ?? 'Guest', guest: !this.networkToken, worldId, token: this.networkToken || undefined, mapId: this.map.id, x: this.position.x, y: this.position.y }, { pingIntervalMs: 0 });
     this.networkOff = this.network.onMessage((message) => {
       if (message.type === 'hello:ack') this.network.send('presence:update', { mapId: this.map.id, x: this.position.x, y: this.position.y });
       if (message.type === 'presence:list') { this.onlinePlayers.clear(); message.payload.players.forEach((player) => this.onlinePlayers.set(player.accountId, player)); this.syncRemotePlayers(); }

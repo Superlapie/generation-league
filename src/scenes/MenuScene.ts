@@ -391,7 +391,7 @@ export class MenuScene extends Phaser.Scene {
     const stored = this.authToken || (() => { try { return JSON.parse(localStorage.getItem('generation-league:auth:v1') ?? '{}').token ?? ''; } catch { return ''; } })();
     this.authToken = stored;
     const url = worldSocketUrl();
-    this.network.connect(url, { displayName: gameStore.save?.player.name ?? 'Guest', guest: !stored, worldId: 'mossmere', token: stored || undefined });
+    this.network.connect(url, { displayName: gameStore.save?.player.name ?? 'Guest', guest: !stored, worldId: 'mossmere', token: stored || undefined, mapId: gameStore.save?.location.mapId, x: gameStore.save?.location.x, y: gameStore.save?.location.y });
   }
 
   private renderParty() {
@@ -673,7 +673,7 @@ export class MenuScene extends Phaser.Scene {
       localStorage.setItem('generation-league:world:v1', world.id);
       const stored = this.authToken || (() => { try { return JSON.parse(localStorage.getItem('generation-league:auth:v1') ?? '{}').token ?? ''; } catch { return ''; } })();
       this.authToken = stored;
-      this.network.connect(url, { displayName: gameStore.save?.player.name ?? 'Guest', guest: !stored, worldId: world.id, token: stored || undefined });
+      this.network.connect(url, { displayName: gameStore.save?.player.name ?? 'Guest', guest: !stored, worldId: world.id, token: stored || undefined, mapId: gameStore.save?.location.mapId, x: gameStore.save?.location.x, y: gameStore.save?.location.y });
       this.worldStatus = `CONNECTING TO ${world.name.toUpperCase()}`;
       this.render();
       return;
@@ -808,7 +808,7 @@ export class MenuScene extends Phaser.Scene {
     else if (this.page === 'bag' && this.bagReturn === 'party') { this.open('party'); this.cursor = this.partyIndex; this.render(); }
     else this.open('root');
   }
-  private close() { this.authOverlay?.remove(); this.authOverlay = null; this.scene.stop(); this.scene.resume('Overworld'); controls.clear(); }
+  private close() { this.authOverlay?.remove(); this.authOverlay = null; this.network.close(); this.scene.stop(); this.scene.resume('Overworld'); controls.clear(); }
 }
 
 function genderGlyph(gender: CreatureInstance['gender']) { return gender === 'male' ? 'M' : gender === 'female' ? 'F' : '-'; }

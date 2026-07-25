@@ -12,7 +12,7 @@ export function worldSocketUrl() {
 
 export type ClientMessage =
   | { type: 'ping'; payload: Record<string, never> }
-  | { type: 'hello'; payload: { displayName: string; guest: boolean; worldId: string; token?: string } }
+  | { type: 'hello'; payload: { displayName: string; guest: boolean; worldId: string; token?: string; mapId?: string; x?: number; y?: number } }
   | { type: 'auth:register'; payload: { username: string; password: string } }
   | { type: 'auth:login'; payload: { username: string; password: string } }
   | { type: 'profile:get'; payload: Record<string, never> }
@@ -61,16 +61,17 @@ export class GenerationNetworkClient {
   private listeners = new Set<(message: ServerMessage) => void>();
   latencyMs: number | null = null;
 
-  connect(url: string, hello: Extract<ClientMessage, { type: 'hello' }>['payload']) {
+  connect(url: string, hello: Extract<ClientMessage, { type: 'hello' }>['payload'], options: { pingIntervalMs?: number } = {}) {
+    const pingIntervalMs = options.pingIntervalMs ?? 15_000;
     this.close();
     const socket = new WebSocket(url);
     this.socket = socket;
     socket.addEventListener('open', () => {
       this.send('hello', hello);
-      this.pingTimer = window.setInterval(() => {
+      if (pingIntervalMs > 0) this.pingTimer = window.setInterval(() => {
         this.pingStartedAt = performance.now();
         this.send('ping', {});
-      }, 5000);
+      }, pingIntervalMs);
     });
     socket.addEventListener('message', (event) => {
       try {

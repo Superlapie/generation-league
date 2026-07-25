@@ -94,6 +94,11 @@ function send(socket, type, payload) { if (socket.readyState === 1) socket.send(
 function broadcast(worldId, type, payload, except) {
   worlds.get(worldId)?.clients.forEach((client) => { if (client !== except) send(client.socket, type, payload); });
 }
+function broadcastPresence(worldId, player, online, mapId, except) {
+  worlds.get(worldId)?.clients.forEach((client) => {
+    if (client !== except && client.mapId === mapId) send(client.socket, 'presence:changed', { player, online });
+  });
+}
 function cleanText(value) { return String(value ?? '').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '').replace(/[\r\n\t ]+/g, ' ').trim().slice(0, 240); }
 function allowed(accountId, bucket, limit = 8) {
   const now = Date.now();
@@ -128,16 +133,23 @@ async function handleMessage(session, raw) {
     }
     const worldId = worlds.has(payload.worldId) ? payload.worldId : WORLD_IDS[0];
     session.worldId = worldId;
+    session.mapId = cleanText(payload.mapId) || session.mapId;
+    session.x = clamp(payload.x, -999, 999);
+    session.y = clamp(payload.y, -999, 999);
     session.displayName = profiles.get(session.accountId)?.displayName || cleanText(payload.displayName) || 'Guest';
     const profile = profiles.get(session.accountId) ?? defaultProfile(session);
+    const profileChanged = profile.worldId !== worldId || profile.guest !== session.guest;
     profile.worldId = worldId;
-    profile.updatedAt = Date.now();
+    if (profileChanged) profile.updatedAt = Date.now();
     profiles.set(session.accountId, profile);
-    if (!session.guest) persistState();
-    worlds.get(worldId).clients.set(session.accountId, session);
+    if (!session.guest && profileChanged) persistState();
+    const world = worlds.get(worldId);
+    const previous = world.clients.get(session.accountId);
+    if (previous && previous !== session) previous.socket.close(1000, 'replaced');
+    world.clients.set(session.accountId, session);
     send(session.socket, 'hello:ack', { accountId: session.accountId, worldId });
-    send(session.socket, 'presence:list', { players: [...worlds.get(worldId).clients.values()].map(presence) });
-    broadcast(worldId, 'presence:changed', { player: presence(session), online: true }, session);
+    send(session.socket, 'presence:list', { players: [...world.clients.values()].filter((client) => client.mapId === session.mapId).map(presence) });
+    broadcastPresence(worldId, presence(session), true, session.mapId, session);
     return broadcastDirectory();
   }
 
@@ -157,10 +169,12 @@ async function handleMessage(session, raw) {
 
   if (!session.worldId) return fail(session, 'not_ready', 'Join a world before sending actions.');
   if (message.type === 'presence:update') {
+    const previousMapId = session.mapId;
     session.mapId = cleanText(payload.mapId) || session.mapId;
     session.x = clamp(payload.x, -999, 999);
     session.y = clamp(payload.y, -999, 999);
-    return broadcast(session.worldId, 'presence:changed', { player: presence(session), online: true }, session);
+    if (previousMapId !== session.mapId) broadcastPresence(session.worldId, { ...presence(session), mapId: previousMapId }, false, previousMapId, session);
+    return broadcastPresence(session.worldId, presence(session), true, session.mapId, session);
   }
   if (message.type === 'chat:send') {
     if (!allowed(session.accountId, 'chat')) return fail(session, 'rate_limited', 'Please slow down before sending another message.');
@@ -256,8 +270,9 @@ function presence(session) { return { accountId: session.accountId, displayName:
 function leaveWorld(session) {
   if (!session.worldId) return;
   const world = worlds.get(session.worldId);
+  if (world?.clients.get(session.accountId) !== session) return;
   world?.clients.delete(session.accountId);
-  broadcast(session.worldId, 'presence:changed', { player: presence(session), online: false });
+  broadcastPresence(session.worldId, presence(session), false, session.mapId, session);
   broadcastDirectory();
 }
 function broadcastDirectory() { worlds.forEach((world) => world.clients.forEach((client) => send(client.socket, 'worlds:list', { worlds: directory() }))); }

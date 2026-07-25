@@ -12,9 +12,11 @@ import { CreditsScene } from './scenes/CreditsScene';
 import { gameStore } from './state';
 import { initGameScale } from './online/gameScale';
 import { initLeagueLink } from './online/LeagueLink';
+import { initTouchControls } from './ui/touchControls';
 
 controls.init();
 initLeagueLink();
+initTouchControls();
 
 const game = new Phaser.Game({
   type: Phaser.AUTO,

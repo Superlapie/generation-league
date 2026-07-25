@@ -1,7 +1,7 @@
 :root {
   color-scheme: dark;
   --font-ui: "Segoe UI", Arial, sans-serif;
-  --font-pixel: "Consolas", "Liberation Mono", "Courier New", monospace;
+  --font-pixel: "Generation Pixel", "Press Start 2P", "Courier New", monospace;
   --bg-page: #090e0a;
   --bg-shell: #101914;
   --bg-panel: #18261f;
@@ -185,12 +185,22 @@ button:focus-visible {
   image-rendering: crisp-edges;
 }
 
+@font-face {
+  font-family: "Generation Pixel";
+  src: url("/assets/ninja-adventure/font.ttf") format("truetype");
+  font-display: block;
+}
+
 #touch-controls {
-  display: block;
+  display: none;
   position: absolute;
   inset: 0;
   z-index: 50;
   pointer-events: none;
+}
+
+body[data-touch-input="true"] #touch-controls {
+  display: block;
 }
 
 .game-footer {
@@ -367,7 +377,7 @@ body.ll-drawer-open #league-link.is-drawer {
   color: #ecf1df;
   background: #111b13e6;
   box-shadow: inset 0 0 0 2px #0009, 0 3px 0 #000b, 0 4px 10px #0008;
-  opacity: .18;
+  opacity: 0.88;
   transition: opacity 120ms ease, transform 80ms ease, filter 120ms ease;
 }
 #touch-controls button:hover,
@@ -450,7 +460,6 @@ body.ll-drawer-open #league-link.is-drawer {
 }
 
 @media (pointer: coarse) {
-  #touch-controls button { opacity: .88; }
   .dpad { width: 88px; height: 88px; }
   .dpad button { width: 30px; height: 30px; }
   .dpad [data-key="UP"] { left: 29px; }

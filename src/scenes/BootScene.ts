@@ -1,6 +1,8 @@
 import Phaser from 'phaser';
 import { SPECIES } from '../data';
 import { configureGbaCamera } from '../display';
+import { registerUiIcons } from '../ui/icons';
+import { ensurePixelFont } from '../ui/typography';
 import { walkFrames } from '../world';
 
 export class BootScene extends Phaser.Scene {
@@ -43,6 +45,7 @@ export class BootScene extends Phaser.Scene {
     this.load.audio('music-dream','assets/ninja-adventure/music/theme_dream.ogg');
   }
   create() {
+    ensurePixelFont().catch(() => undefined);
     document.body.dataset.gameScene='title';
     this.game.canvas.style.imageRendering = 'pixelated';
     const make = (key: string, draw: (g: Phaser.GameObjects.Graphics) => void) => {
@@ -64,6 +67,7 @@ export class BootScene extends Phaser.Scene {
     make('pixel-circle',(g) => g.fillStyle(0xffffff).fillCircle(8,8,4));
     make('field-sign',(g) => { g.fillStyle(0x3b2c25).fillRect(7,8,2,8);g.fillStyle(0x7d5639).fillRect(2,2,12,9);g.fillStyle(0xd4a55e).fillRect(3,3,10,6);g.fillStyle(0x4e382a).fillRect(4,4,8,1).fillRect(4,6,6,1); });
     Object.values(this.textures.list).forEach((texture) => texture.setFilter(Phaser.Textures.FilterMode.NEAREST));
+    registerUiIcons(this);
     const directionFrames = { down: walkFrames('down'), up: walkFrames('up'), left: walkFrames('left'), right: walkFrames('right') };
     for (const avatar of ['a','b']) for (const [direction,frames] of Object.entries(directionFrames)) {
       this.anims.create({key:`${avatar}-${direction}`,frames:frames.map((frame)=>({key:`avatar-${avatar}`,frame})),frameRate:20,repeat:-1});

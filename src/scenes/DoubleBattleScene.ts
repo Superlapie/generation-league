@@ -9,7 +9,17 @@ import { resolveDoubleTurn, type DoubleBattleState, type DoubleAction } from '..
 import { gameStore } from '../state';
 import { rewardMultiplier } from '../triggers';
 import type { BattleEvent, CreatureInstance, TrainerDefinition } from '../types';
-import { COLORS, hpColor, label, panel, textStyle } from '../ui';
+import {
+  drawBattleArena,
+  arenaPaletteForMap,
+  drawBattleDialogue,
+  drawCommandGrid,
+  drawMoveGrid,
+  drawBattleBagModal,
+  drawBattlePartyModal,
+} from '../ui/battleComponents';
+import { UI_COLORS, hpColor } from '../ui/theme';
+import { label } from '../ui/primitives';
 
 type DoubleMode = 'command' | 'moves' | 'target' | 'bag' | 'party' | 'itemTarget' | 'locked';
 interface DoubleBattleInit { trainer: TrainerDefinition; mapId: string }
@@ -102,13 +112,7 @@ export class DoubleBattleScene extends Phaser.Scene {
   private enemyName(slot: 0 | 1) { return SPECIES[this.enemy(slot).speciesId].name; }
 
   private renderArena() {
-    const g = this.add.graphics();
-    g.fillGradientStyle(0x9fd1be, 0x9fd1be, 0xe7edbd, 0xe7edbd, 1).fillRect(0, 0, 240, 111);
-    g.fillStyle(0xf1efd2).fillRect(0, 111, 240, 49);
-    for (let y = 4; y < 108; y += 5) g.fillStyle(0xffffff, .08).fillRect(0, y, 240, 1);
-    g.fillStyle(0x7fb987, .36).fillEllipse(174, 66, 108, 22);
-    g.fillStyle(0x709c67, .45).fillEllipse(62, 118, 126, 28);
-    g.fillStyle(0x4c5849).fillRect(0, 110, 240, 2);
+    drawBattleArena(this, arenaPaletteForMap(this.mapId));
   }
 
   private renderCombatants() {
@@ -124,88 +128,78 @@ export class DoubleBattleScene extends Phaser.Scene {
     const enemyCards: Array<[number, number]> = [[8, 6], [126, 6]];
     const playerCards: Array<[number, number]> = [[8, 77], [126, 77]];
     [0, 1].forEach((slot) => {
-      const enemy = this.enemy(slot as 0 | 1); const player = this.player(slot as 0 | 1);
-      const [ex, ey] = enemyCards[slot]; const [px, py] = playerCards[slot];
-      panel(this, ex, ey, 106, 28, COLORS.paper, 8); panel(this, px, py, 106, 28, COLORS.paper, 8);
+      const enemy = this.enemy(slot as 0 | 1);
+      const player = this.player(slot as 0 | 1);
+      const [ex, ey] = enemyCards[slot];
+      const [px, py] = playerCards[slot];
+      const eMax = calculateStats(enemy, SPECIES[enemy.speciesId]).hp;
+      const pMax = calculateStats(player, SPECIES[player.speciesId]).hp;
+      const eRatio = Math.max(0, enemy.currentHp / eMax);
+      const pRatio = Math.max(0, player.currentHp / pMax);
+      const ep = this.add.graphics().setDepth(8);
+      ep.fillStyle(UI_COLORS.enemyPanel, 1).fillRect(ex, ey, 106, 28);
+      ep.fillStyle(UI_COLORS.recessed, 1).fillRect(ex + 4, ey + 16, 88, 5);
       label(this, ex + 6, ey + 5, `${this.enemyName(slot as 0 | 1).toUpperCase()} Lv${enemy.level}`, 6, '#182017', 9);
+      label(this, ex + 6, ey + 16, 'HP', 5, '#aa4b35', 9);
+      this.enemyBars[slot] = this.add.rectangle(ex + 23, ey + 18, 74 * eRatio, 2, eRatio > 0.5 ? 0x5ca85c : eRatio > 0.2 ? 0xd2a73d : 0xb74635).setOrigin(0).setDepth(10);
+      this.enemyHpText[slot] = label(this, ex + 98, ey + 22, `${enemy.currentHp}/${eMax}`, 5, '#52665c', 10).setOrigin(1, 0);
+      const pp = this.add.graphics().setDepth(8);
+      pp.fillStyle(UI_COLORS.playerPanel, 1).fillRect(px, py, 106, 28);
+      pp.fillStyle(UI_COLORS.recessed, 1).fillRect(px + 4, py + 16, 88, 5);
       label(this, px + 6, py + 5, `${this.playerName(slot as 0 | 1).toUpperCase()} Lv${player.level}`, 6, '#182017', 9);
-      label(this, ex + 6, ey + 16, 'HP', 5, '#aa4b35', 9); label(this, px + 6, py + 16, 'HP', 5, '#aa4b35', 9);
-      this.add.rectangle(ex + 22, ey + 17, 76, 4, 0x263226).setOrigin(0).setDepth(9); this.add.rectangle(px + 22, py + 17, 76, 4, 0x263226).setOrigin(0).setDepth(9);
-      this.enemyBars[slot] = this.add.rectangle(ex + 23, ey + 18, 74, 2, 0x5ca85c).setOrigin(0).setDepth(10);
-      this.playerBars[slot] = this.add.rectangle(px + 23, py + 18, 74, 2, 0x5ca85c).setOrigin(0).setDepth(10);
-      this.enemyHpText[slot] = label(this, ex + 98, ey + 22, '', 5, '#52665c', 10).setOrigin(1, 0);
-      this.playerHpText[slot] = label(this, px + 98, py + 22, '', 5, '#52665c', 10).setOrigin(1, 0);
+      label(this, px + 6, py + 16, 'HP', 5, '#aa4b35', 9);
+      this.playerBars[slot] = this.add.rectangle(px + 23, py + 18, 74 * pRatio, 2, pRatio > 0.5 ? 0x5ca85c : pRatio > 0.2 ? 0xd2a73d : 0xb74635).setOrigin(0).setDepth(10);
+      this.playerHpText[slot] = label(this, px + 98, py + 22, `${player.currentHp}/${pMax}`, 5, '#52665c', 10).setOrigin(1, 0);
     });
     this.updateHpBars();
   }
 
-  private renderDialogue() { panel(this, 3, 113, 234, 44, COLORS.paper, 15); this.dialogue = this.add.text(11, 121, '', textStyle(8, '#182017')).setDepth(16).setWordWrapWidth(214); }
+  private renderDialogue() { this.dialogue = drawBattleDialogue(this); }
   private showText(value: string) { this.dialogue?.setText(value); }
   private clearMenu() { this.uiObjects.forEach((object) => object.destroy()); this.uiObjects = []; }
   private openCommand() { this.mode = 'command'; this.cursor = 0; this.showText(`What will ${this.playerName(this.commandSlot)} do?`); this.renderMenu(); }
+  private sink = (o: Phaser.GameObjects.GameObject) => { this.uiObjects.push(o); };
+
   private renderMenu() {
-    this.clearMenu(); if (this.mode === 'locked') return;
+    this.clearMenu();
+    if (this.mode === 'locked') return;
     if (this.mode === 'command') {
-      this.drawGrid(['FIGHT', 'BAG', 'PARTY', 'RUN']);
-      this.uiObjects.push(label(this, 120, 151, `A: CHOOSE ${this.playerName(this.commandSlot).toUpperCase()}`, 5, '#f1f1d0', 30).setOrigin(.5, 0));
+      drawCommandGrid(this, ['FIGHT', 'BAG', 'PARTY', 'RUN'], this.cursor, [false, false, false, true], this.sink, (i) => { this.cursor = i; this.choose(); });
+      this.uiObjects.push(label(this, 120, 151, `A: CHOOSE ${this.playerName(this.commandSlot).toUpperCase()}`, 5, '#f1f1d0', 30).setOrigin(0.5, 0));
       return;
     }
     if (this.mode === 'moves') {
-      const creature = this.player(this.commandSlot); const names = Array.from({ length: 4 }, (_, index) => creature.moves[index] ? MOVES[creature.moves[index].moveId].name : '---');
-      this.drawGrid(names); this.uiObjects.push(label(this, 120, 151, 'A: CHOOSE MOVE   B: BACK', 5, '#f1f1d0', 30).setOrigin(.5, 0));
+      const creature = this.player(this.commandSlot);
+      const names = Array.from({ length: 4 }, (_, index) => creature.moves[index] ? MOVES[creature.moves[index].moveId].name : '---');
+      drawCommandGrid(this, names, this.cursor, names.map((n) => n === '---'), this.sink, (i) => { this.cursor = i; this.choose(); });
+      this.uiObjects.push(label(this, 120, 151, 'A: CHOOSE MOVE   B: BACK', 5, '#f1f1d0', 30).setOrigin(0.5, 0));
       return;
     }
     if (this.mode === 'target') {
       const names = [this.enemyName(0), this.enemyName(1)];
-      this.drawGrid(names); this.uiObjects.push(label(this, 120, 151, 'A: TARGET   B: BACK', 5, '#f1f1d0', 30).setOrigin(.5, 0));
+      drawCommandGrid(this, names, this.cursor, [false, false], this.sink, (i) => { this.cursor = i; this.choose(); });
+      this.uiObjects.push(label(this, 120, 151, 'A: TARGET   B: BACK', 5, '#f1f1d0', 30).setOrigin(0.5, 0));
       return;
     }
     if (this.mode === 'bag') { this.drawBattleBag(); return; }
     this.drawBattleParty();
   }
-  private drawGrid(values: string[]) { values.forEach((value, index) => { const x = 9 + (index % 2) * 110; const y = 117 + Math.floor(index / 2) * 17; const selected = index === this.cursor; const bg = this.add.rectangle(x, y, 106, 15, selected ? COLORS.blue : 0xe5e6c7).setOrigin(0).setDepth(20).setInteractive(); const text = label(this, x + 5, y + 4, `${selected ? '▶ ' : ''}${value.toUpperCase()}`, 7, selected ? '#fff' : '#182017', 21); bg.on('pointerdown', () => { this.cursor = index; this.choose(); }); this.uiObjects.push(bg, text); }); }
 
   private availableBag() { return gameStore.save!.inventory.filter((stack) => stack.count > 0 && ITEMS[stack.itemId]?.category === 'recovery'); }
 
   private drawBattleBag() {
     const bag = this.availableBag();
     if (!bag.length) { this.showText('There are no usable recovery items.'); return; }
-    const shade = this.add.rectangle(0, 0, 240, 160, 0x0b1610, .78).setOrigin(0).setDepth(25);
-    const shell = panel(this, 6, 7, 228, 146, COLORS.paper, 26);
-    const title = label(this, 15, 15, 'BATTLE BAG', 11, '#20342f', 27);
-    const hint = label(this, 225, 18, 'A: USE  B: BACK', 5, '#59684f', 27).setOrigin(1, 0);
-    this.uiObjects.push(shade, shell, title, hint);
-    bag.forEach((stack, index) => {
-      const selected = index === this.cursor; const y = 38 + index * 17;
-      const row = this.add.rectangle(13, y, 101, 15, selected ? COLORS.blue : 0xdce4c8).setOrigin(0).setDepth(27).setInteractive();
-      const name = label(this, 19, y + 4, `${selected ? '▶ ' : ''}${ITEMS[stack.itemId].name}`, 7, selected ? '#fff' : '#20342f', 28);
-      const count = label(this, 109, y + 4, `×${stack.count}`, 6, selected ? '#fff' : '#59684f', 28).setOrigin(1, 0);
-      row.on('pointerdown', () => { this.cursor = index; this.choose(); }); this.uiObjects.push(row, name, count);
-    });
-    const stack = bag[this.cursor], item = stack && ITEMS[stack.itemId];
-    if (item) {
-      const icon = this.add.graphics().setDepth(28); icon.fillStyle(0x31514e).fillRoundedRect(166, 45, 20, 24, 4); icon.fillStyle(0xe9edcf).fillRect(171, 40, 10, 7); icon.fillStyle(0x8fc79d).fillRect(169, 54, 14, 7);
-      const itemName = label(this, 128, 80, item.name.toUpperCase(), 8, '#20342f', 28); const description = this.add.text(128, 94, item.description, textStyle(6, '#52665c')).setDepth(28).setWordWrapWidth(94);
-      this.uiObjects.push(icon, itemName, description);
-    }
+    drawBattleBagModal(this, { items: bag, cursor: this.cursor }, this.sink, (i) => { this.cursor = i; this.choose(); });
   }
 
   private drawBattleParty() {
-    const shade = this.add.rectangle(0, 0, 240, 160, 0x0b1610, .78).setOrigin(0).setDepth(25);
-    const shell = panel(this, 6, 7, 228, 146, COLORS.paper, 26);
-    const title = label(this, 15, 15, this.mode === 'itemTarget' ? `USE ${ITEMS[this.selectedItemId].name.toUpperCase()}` : 'CHOOSE A CREATURE', 10, '#20342f', 27);
-    const hint = label(this, 225, 18, 'A: CHOOSE  B: BACK', 5, '#59684f', 27).setOrigin(1, 0);
-    this.uiObjects.push(shade, shell, title, hint);
-    this.state.player.party.forEach((creature, index) => {
-      const species = SPECIES[creature.speciesId]; const max = calculateStats(creature, species).hp; const ratio = Math.max(0, creature.currentHp / max); const selected = index === this.cursor; const y = 35 + index * 18;
-      const row = this.add.rectangle(13, y, 214, 16, selected ? COLORS.blue : 0xdce4c8).setOrigin(0).setDepth(27).setInteractive();
-      const name = label(this, 20, y + 3, `${selected ? '▶ ' : ''}${creature.nickname || species.name}`, 7, selected ? '#fff' : '#20342f', 28);
-      const level = label(this, 152, y + 3, `Lv${creature.level}`, 6, selected ? '#fff' : '#52665c', 28);
-      const hp = label(this, 220, y + 3, `${creature.currentHp}/${max}`, 6, selected ? '#fff' : '#52665c', 28).setOrigin(1, 0);
-      const barBg = this.add.rectangle(166, y + 12, 54, 2, 0x34443c).setOrigin(0).setDepth(28); const bar = this.add.rectangle(167, y + 12, 52 * ratio, 1, hpColor(ratio)).setOrigin(0).setDepth(29);
-      row.on('pointerdown', () => { this.cursor = index; this.choose(); }); this.uiObjects.push(row, name, level, hp, barBg, bar);
-      if (index === this.state.player.activeSlots[this.commandSlot]) this.uiObjects.push(label(this, 145, y + 10, 'ACTIVE', 5, selected ? '#eef1d5' : '#7b6843', 29).setOrigin(1, 0));
-    });
+    drawBattlePartyModal(this, {
+      title: this.mode === 'itemTarget' ? `USE ${ITEMS[this.selectedItemId].name.toUpperCase()}` : 'CHOOSE A CREATURE',
+      party: this.state.player.party,
+      cursor: this.cursor,
+      activeIndices: this.state.player.activeSlots,
+    }, this.sink, (i) => { this.cursor = i; this.choose(); });
   }
 
   private choose() {

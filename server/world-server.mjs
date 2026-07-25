@@ -40,7 +40,7 @@ http.on('upgrade', (request, socket, head) => {
 sockets.on('connection', (socket) => {
   socket.isAlive = true;
   socket.on('pong', () => { socket.isAlive = true; });
-  const session = { accountId: `guest-${randomUUID()}`, displayName: 'Guest', guest: true, token: null, worldId: null, mapId: 'mossmere', x: 7, y: 6, socket, seenIds: new Set() };
+  const session = { accountId: `guest-${randomUUID()}`, displayName: 'Guest', guest: true, token: null, worldId: null, mapId: 'mossmere', x: 7, y: 6, socket, seenIds: new Set(), visibleIds: new Set() };
   send(socket, 'worlds:list', { worlds: directory() });
   socket.on('message', (raw) => void handleMessage(session, raw));
   socket.on('close', () => leaveWorld(session));
@@ -106,9 +106,34 @@ function broadcastPresenceTransition(worldId, previous, current, except) {
     if (client === except) return;
     const wasVisible = previous && canSee(client, previous);
     const isVisible = current && canSee(client, current);
-    if (isVisible) send(client.socket, 'presence:changed', { player: current, online: true });
-    else if (wasVisible) send(client.socket, 'presence:changed', { player: previous, online: false });
+    if (isVisible) {
+      client.visibleIds.add(current.accountId);
+      send(client.socket, 'presence:changed', { player: current, online: true });
+    } else if (wasVisible) {
+      client.visibleIds.delete(previous.accountId);
+      send(client.socket, 'presence:changed', { player: previous, online: false });
+    }
   });
+}
+function nearbyPlayers(session) {
+  return [...(worlds.get(session.worldId)?.clients.values() ?? [])]
+    .filter((client) => client !== session && canSee(session, presence(client)));
+}
+function refreshPresenceView(session) {
+  const nearby = nearbyPlayers(session);
+  const nextIds = new Set(nearby.map((player) => player.accountId));
+  nearby.forEach((player) => {
+    if (!session.visibleIds.has(player.accountId)) send(session.socket, 'presence:changed', { player: presence(player), online: true });
+  });
+  session.visibleIds.forEach((accountId) => {
+    if (nextIds.has(accountId)) return;
+    const player = [...(worlds.get(session.worldId)?.clients.values() ?? [])].find((client) => client.accountId === accountId);
+    send(session.socket, 'presence:changed', {
+      player: player ? presence(player) : { accountId, displayName: '', worldId: session.worldId, x: 0, y: 0, mapId: '', onlineAt: Date.now() },
+      online: false,
+    });
+  });
+  session.visibleIds = nextIds;
 }
 function cleanText(value) { return String(value ?? '').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '').replace(/[\r\n\t ]+/g, ' ').trim().slice(0, 240); }
 function allowed(accountId, bucket, limit = 8) {
@@ -159,7 +184,9 @@ async function handleMessage(session, raw) {
     if (previous && previous !== session) previous.socket.close(1000, 'replaced');
     world.clients.set(session.accountId, session);
     send(session.socket, 'hello:ack', { accountId: session.accountId, worldId });
-    send(session.socket, 'presence:list', { players: [...world.clients.values()].filter((client) => client !== session && canSee(session, presence(client))).map(presence) });
+    const nearby = nearbyPlayers(session);
+    session.visibleIds = new Set(nearby.map((player) => player.accountId));
+    send(session.socket, 'presence:list', { players: nearby.map(presence) });
     broadcastPresenceTransition(worldId, null, presence(session), session);
     return broadcastDirectory();
   }
@@ -184,7 +211,9 @@ async function handleMessage(session, raw) {
     session.mapId = cleanText(payload.mapId) || session.mapId;
     session.x = clamp(payload.x, -999, 999);
     session.y = clamp(payload.y, -999, 999);
-    return broadcastPresenceTransition(session.worldId, previous, presence(session), session);
+    broadcastPresenceTransition(session.worldId, previous, presence(session), session);
+    refreshPresenceView(session);
+    return;
   }
   if (message.type === 'chat:send') {
     if (!allowed(session.accountId, 'chat')) return fail(session, 'rate_limited', 'Please slow down before sending another message.');
@@ -291,6 +320,7 @@ function leaveWorld(session) {
   if (world?.clients.get(session.accountId) !== session) return;
   const previous = presence(session);
   world?.clients.delete(session.accountId);
+  session.visibleIds.clear();
   broadcastPresenceTransition(session.worldId, previous, null, session);
   broadcastDirectory();
 }

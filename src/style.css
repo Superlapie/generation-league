@@ -12,39 +12,46 @@ body { min-height: 100vh; display: grid; place-items: center; overflow: auto; to
 button { font: inherit; touch-action: none; user-select: none; -webkit-user-select: none; }
 button:focus-visible { outline: 2px solid #e2c15d; outline-offset: 3px; }
 
-#game-frame .account-form {
-  width: 196px;
-  display: grid;
-  gap: 6px;
-  color: #30433a;
-  font: 700 8px/1.1 "Segoe UI", Arial, sans-serif;
-  letter-spacing: .02em;
+.auth-overlay {
+  position: fixed;
+  z-index: 200;
+  inset: 0;
+  overflow: auto;
+  padding: clamp(18px, 5vw, 64px);
+  color: #edf2dc;
+  background: #101914;
+  font-family: "Segoe UI", Arial, sans-serif;
+  image-rendering: auto;
 }
-#game-frame .account-form label { display: grid; gap: 3px; }
-#game-frame .account-form input {
-  width: 100%;
-  min-height: 20px;
-  border: 2px solid #6f805e;
-  border-radius: 2px;
-  padding: 2px 5px;
-  color: #20342f;
-  background: #f4f2d8;
-  font: 700 9px/1 "Segoe UI", Arial, sans-serif;
-}
-#game-frame .account-form input:focus { outline: 2px solid #d5b545; outline-offset: 1px; }
-#game-frame .account-actions { display: flex; gap: 6px; margin-top: 1px; }
-#game-frame .account-actions button {
-  flex: 1;
-  min-height: 21px;
-  border: 2px solid #314d48;
-  border-radius: 2px;
-  color: #f4f2d8;
-  background: #3f7778;
-  font: 800 8px/1 "Segoe UI", Arial, sans-serif;
-  cursor: pointer;
-}
-#game-frame .account-actions button:hover,
-#game-frame .account-actions button:focus-visible { background: #5b8f94; }
+.auth-overlay[hidden] { display: none; }
+.auth-shell { width: min(1120px, 100%); min-height: 100%; margin: auto; display: grid; align-content: center; gap: clamp(32px, 6vh, 72px); }
+.auth-brand { display: flex; align-items: center; gap: 14px; }
+.auth-mark { display: grid; place-items: center; width: 46px; height: 46px; border: 2px solid #d8d968; color: #13221b; background: #d8d968; font-weight: 900; letter-spacing: 0; }
+.auth-brand p, .auth-kicker { margin: 0; color: #d8d968; font-size: 11px; font-weight: 800; letter-spacing: .16em; }
+.auth-brand h1 { margin: 5px 0 0; color: #f5f5de; font-size: clamp(22px, 3vw, 38px); line-height: 1; letter-spacing: 0; }
+.auth-layout { display: grid; grid-template-columns: minmax(260px, .9fr) minmax(340px, 460px); gap: clamp(28px, 8vw, 120px); align-items: center; }
+.auth-intro { max-width: 420px; }
+.auth-intro h2 { margin: 14px 0; color: #f5f5de; font-size: clamp(28px, 4.5vw, 56px); line-height: .98; letter-spacing: 0; }
+.auth-intro p { max-width: 360px; margin: 0; color: #a9b8a5; font-size: 16px; line-height: 1.6; }
+.auth-worlds { display: flex; align-items: center; gap: 8px; margin-top: 38px; color: #899b88; font-size: 10px; font-weight: 800; letter-spacing: .12em; }
+.auth-worlds span { display: grid; place-items: center; width: 28px; height: 28px; border: 1px solid #668276; color: #d8d968; }
+.auth-worlds b { margin-left: 8px; font-size: 10px; font-weight: 800; }
+.auth-card { display: grid; gap: 18px; padding: clamp(22px, 4vw, 38px); border: 1px solid #516b5e; background: #18261f; box-shadow: 14px 14px 0 #0a100c; }
+.auth-card-head { display: flex; justify-content: space-between; gap: 16px; align-items: start; padding-bottom: 20px; border-bottom: 1px solid #30483b; }
+.auth-card h2 { margin: 8px 0 0; color: #f5f5de; font-size: 25px; letter-spacing: 0; }
+.auth-close { width: 32px; height: 32px; border: 1px solid #668276; color: #d8d968; background: transparent; font-size: 22px; line-height: 1; cursor: pointer; }
+.auth-close:hover, .auth-close:focus-visible { color: #13221b; background: #d8d968; }
+.auth-card label { display: grid; gap: 8px; color: #a9b8a5; font-size: 10px; font-weight: 800; letter-spacing: .12em; }
+.auth-card input { width: 100%; min-height: 48px; border: 1px solid #668276; padding: 0 13px; color: #f5f5de; background: #101914; font: 600 15px/1 "Segoe UI", Arial, sans-serif; letter-spacing: 0; }
+.auth-card input::placeholder { color: #63776b; }
+.auth-card input:focus { outline: 2px solid #d8d968; outline-offset: 2px; border-color: #d8d968; }
+.auth-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 2px; }
+.auth-actions button { min-height: 48px; border: 1px solid #d8d968; padding: 0 12px; color: #13221b; background: #d8d968; font-size: 11px; font-weight: 900; letter-spacing: .05em; cursor: pointer; }
+.auth-actions button + button { color: #edf2dc; background: #3b706d; border-color: #6eaaa0; }
+.auth-actions button:hover, .auth-actions button:focus-visible { filter: brightness(1.14); transform: translateY(-1px); }
+.auth-actions span { margin-left: 6px; font-size: 16px; }
+.auth-status { min-height: 18px; margin: 0; color: #d8d968; font-size: 11px; font-weight: 800; letter-spacing: .05em; }
+.auth-note { margin: -4px 0 0; color: #718477; font-size: 11px; line-height: 1.4; }
 #game-frame .chat-form { width: 212px; display: flex; gap: 4px; }
 #game-frame .chat-form input {
   flex: 1;
@@ -129,6 +136,21 @@ footer strong { color: #c9d6b6; }
   #game-frame { aspect-ratio: 3 / 2; border-width: 3px; border-radius: 7px 7px 14px 7px; }
   footer { justify-content: center; font-size: 9px; }
   footer span { display: none; }
+}
+
+@media (max-width: 700px) {
+  .auth-overlay { padding: 24px 18px; }
+  .auth-shell { align-content: start; gap: 34px; padding-top: 12px; }
+  .auth-layout { grid-template-columns: 1fr; gap: 26px; }
+  .auth-intro h2 { font-size: clamp(30px, 10vw, 44px); }
+  .auth-intro p { font-size: 14px; }
+  .auth-worlds { margin-top: 20px; }
+  .auth-card { box-shadow: 8px 8px 0 #0a100c; }
+}
+
+@media (max-width: 420px) {
+  .auth-actions { grid-template-columns: 1fr; }
+  .auth-brand h1 { font-size: 20px; }
 }
 
 @media (pointer: coarse) {

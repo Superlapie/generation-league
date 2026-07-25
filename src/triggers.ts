@@ -80,7 +80,7 @@ export function afterDamageRecoil(defender: CreatureInstance, attacker: Creature
 export function endTurn(creature: CreatureInstance, rng: Rng) {
   const rule = rulesFor(creature).find((entry) => entry.trigger === 'endTurn' && matches(entry.condition, creature, { type: 'Neutral' } as MoveDefinition));
   if (!rule || rule.effect.kind !== 'cureStatus' || rng.next() * 100 >= rule.effect.chance) return false;
-  creature.status = null; creature.sleepTurns = 0; return true;
+  creature.status = null; creature.sleepTurns = 0; creature.toxicCounter = 0; creature.confusionTurns = undefined; return true;
 }
 
 export function rewardMultiplier(creature: CreatureInstance) {

@@ -1,0 +1,21 @@
+[Unit]
+Description=Generation League World Server
+After=network.target
+
+[Service]
+Type=simple
+User=generation
+Group=generation
+WorkingDirectory=/opt/generation-league
+EnvironmentFile=/etc/generation-league/world.env
+ExecStart=/usr/bin/node /opt/generation-league/server/world-server.mjs
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/opt/generation-league/server
+
+[Install]
+WantedBy=multi-user.target

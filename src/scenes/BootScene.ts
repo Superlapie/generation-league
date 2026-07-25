@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { SPECIES } from '../data';
 import { configureGbaCamera } from '../display';
+import { walkFrames } from '../world';
 
 export class BootScene extends Phaser.Scene {
   constructor() { super('Boot'); }
@@ -18,10 +19,10 @@ export class BootScene extends Phaser.Scene {
       this.load.image(`${species.id}-front`,`${spriteRoot}/${species.id}-front.png`);
       this.load.image(`${species.id}-back`,`${spriteRoot}/${species.id}-back.png`);
     });
-    this.load.spritesheet('avatar-a','assets/ninja-adventure/characters/player-female.png',{frameWidth:32,frameHeight:32});
-    this.load.spritesheet('avatar-b','assets/ninja-adventure/characters/player-male.png',{frameWidth:32,frameHeight:32});
+    this.load.spritesheet('avatar-a','assets/characters/player-female.png',{frameWidth:128,frameHeight:128});
+    this.load.spritesheet('avatar-b','assets/characters/player-male.png',{frameWidth:128,frameHeight:128});
     for (const npc of ['professor','assistant','healer','merchant','elder','ranger','miner','rival']) {
-      this.load.spritesheet(`npc-${npc}`,`assets/ninja-adventure/characters/${npc}.png`,{frameWidth:32,frameHeight:32});
+      this.load.spritesheet(`npc-${npc}`,`assets/characters/${npc}.png`,{frameWidth:128,frameHeight:128});
     }
     this.load.spritesheet('prop-grass','assets/ninja-adventure/props/grass.png',{frameWidth:16,frameHeight:16});
     this.load.spritesheet('prop-pig','assets/ninja-adventure/characters/pig.png',{frameWidth:16,frameHeight:16});
@@ -32,6 +33,7 @@ export class BootScene extends Phaser.Scene {
     this.load.spritesheet('wall-sheet','assets/ninja-adventure/tiles/walls.png',{frameWidth:16,frameHeight:16});
     this.load.image('vendor-village','assets/ninja-adventure/tiles/village.png');
     this.load.image('vendor-panel','assets/ninja-adventure/ui/panel.png');
+    this.load.image('capture-pod','assets/ui/prism-pod-64.png');
     this.load.image('fx-leaf','assets/ninja-adventure/effects/leaf.png');
     this.load.image('fx-fog','assets/ninja-adventure/effects/fog.png');
     this.load.image('title-background','assets/title-roster-background.png');
@@ -61,9 +63,10 @@ export class BootScene extends Phaser.Scene {
     make('pixel-white',(g) => g.fillStyle(0xffffff).fillRect(0,0,4,4));
     make('pixel-circle',(g) => g.fillStyle(0xffffff).fillCircle(8,8,4));
     make('field-sign',(g) => { g.fillStyle(0x3b2c25).fillRect(7,8,2,8);g.fillStyle(0x7d5639).fillRect(2,2,12,9);g.fillStyle(0xd4a55e).fillRect(3,3,10,6);g.fillStyle(0x4e382a).fillRect(4,4,8,1).fillRect(4,6,6,1); });
-    const directionFrames = { down:[0,4,8,12], up:[1,5,9,13], left:[2,6,10,14], right:[3,7,11,15] };
+    Object.values(this.textures.list).forEach((texture) => texture.setFilter(Phaser.Textures.FilterMode.NEAREST));
+    const directionFrames = { down: walkFrames('down'), up: walkFrames('up'), left: walkFrames('left'), right: walkFrames('right') };
     for (const avatar of ['a','b']) for (const [direction,frames] of Object.entries(directionFrames)) {
-      this.anims.create({key:`${avatar}-${direction}`,frames:frames.map((frame)=>({key:`avatar-${avatar}`,frame})),frameRate:8,repeat:-1});
+      this.anims.create({key:`${avatar}-${direction}`,frames:frames.map((frame)=>({key:`avatar-${avatar}`,frame})),frameRate:20,repeat:-1});
     }
     const village=this.textures.get('vendor-village');
     village.add('tree-spring',0,16,96,32,32);

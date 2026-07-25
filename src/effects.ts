@@ -20,7 +20,7 @@ export interface EffectContext {
   events: BattleEvent[];
   maxHp: (creature: CreatureInstance, species: SpeciesDefinition) => number;
   damage: (move: MoveDefinition) => DamageResult;
-  applyStatus: (target: CreatureInstance, status: Exclude<MajorStatus, null>) => boolean;
+  applyStatus: (target: CreatureInstance, status: Exclude<MajorStatus, null>, toxic?: boolean) => boolean;
   canLowerStage: (target: CreatureInstance) => boolean;
 }
 
@@ -31,8 +31,11 @@ const legacyEffects: Record<string, (move: MoveDefinition) => EffectOperation[]>
   priority: (move) => [{ kind: 'damage', power: move.power }],
   burn: (move) => legacyDamageStatus(move, 'burn'),
   poison: (move) => legacyDamageStatus(move, 'poison'),
+  toxic: (move) => legacyDamageStatus(move, 'poison', 'toxic'),
   paralyze: (move) => legacyDamageStatus(move, 'paralysis'),
   sleep: (move) => legacyDamageStatus(move, 'sleep'),
+  freeze: (move) => legacyDamageStatus(move, 'freeze'),
+  confuse: (move) => legacyDamageConfusion(move),
   heal: (move) => [{ kind: 'heal', ratio: move.ratio ?? .5 }],
   drain: (move) => [{ kind: 'damage', power: move.power }, { kind: 'drain', ratio: move.ratio ?? .5 }],
   recoil: (move) => [{ kind: 'damage', power: move.power }, { kind: 'recoil', ratio: move.ratio ?? .25 }],
@@ -44,10 +47,17 @@ const legacyEffects: Record<string, (move: MoveDefinition) => EffectOperation[]>
   cleanse: (move) => [{ kind: 'cleanse', healRatio: move.ratio ?? .25 }],
 };
 
-function legacyDamageStatus(move: MoveDefinition, status: Exclude<MajorStatus, null>): EffectOperation[] {
+function legacyDamageStatus(move: MoveDefinition, status: Exclude<MajorStatus, null>, mode: 'toxic' | 'status' = 'status'): EffectOperation[] {
   const effects: EffectOperation[] = [];
   if (move.power > 0) effects.push({ kind: 'damage', power: move.power });
-  effects.push({ kind: 'applyStatus', status: move.effectStatus ?? status, chance: move.effectChance ?? 100 });
+  effects.push(mode === 'toxic' ? { kind: 'applyToxic', chance: move.effectChance ?? 100 } : { kind: 'applyStatus', status: move.effectStatus ?? status, chance: move.effectChance ?? 100 });
+  return effects;
+}
+
+function legacyDamageConfusion(move: MoveDefinition): EffectOperation[] {
+  const effects: EffectOperation[] = [];
+  if (move.power > 0) effects.push({ kind: 'damage', power: move.power });
+  effects.push({ kind: 'confuse', chance: move.effectChance ?? 100 });
   return effects;
 }
 
@@ -65,6 +75,13 @@ export function moveEffects(move: MoveDefinition): EffectOperation[] {
 }
 
 function chancePass(chance: number | undefined, rng: Rng) { return chance === undefined || rng.next() * 100 < chance; }
+function multiHitCount(min: number, max: number, rng: Rng) {
+  if (min === 2 && max === 5) {
+    const roll = rng.int(0, 7);
+    return roll < 3 ? 2 : roll < 6 ? 3 : roll === 6 ? 4 : 5;
+  }
+  return rng.int(min, max);
+}
 
 export function executeEffects(effects: EffectOperation[], context: EffectContext): EffectSummary {
   const summary: EffectSummary = { totalDamage: 0, lastEffectiveness: 1 };
@@ -82,9 +99,10 @@ export function executeEffects(effects: EffectOperation[], context: EffectContex
       return;
     }
     if (effect.kind === 'multiHit') {
-      const hits = context.rng.int(effect.min, effect.max);
-      for (let hit = 0; hit < hits && context.target.currentHp > 0; hit += 1) run({ kind: 'damage' });
-      context.events.push({ kind: 'text', side: context.actorSideName, text: `It struck ${hits} times!` });
+      const hits = multiHitCount(effect.min, effect.max, context.rng);
+      let landed = 0;
+      for (; landed < hits && context.target.currentHp > 0; landed += 1) run({ kind: 'damage' });
+      context.events.push({ kind: 'text', side: context.actorSideName, text: `It struck ${landed} times!` });
       return;
     }
     if (effect.kind === 'heal') {
@@ -98,13 +116,29 @@ export function executeEffects(effects: EffectOperation[], context: EffectContex
       const hadStatus = Boolean(context.actor.status);
       context.actor.status = null;
       context.actor.sleepTurns = 0;
+      context.actor.toxicCounter = 0;
+      context.actor.confusionTurns = undefined;
       if (hadStatus) context.events.push({ kind: 'status', side: context.actorSideName, text: `${context.actorName} was cleansed!` });
       if (effect.healRatio) run({ kind: 'heal', ratio: effect.healRatio });
       return;
     }
     if (effect.kind === 'applyStatus') {
       if (!chancePass(effect.chance, context.rng)) return;
-      if (context.applyStatus(context.target, effect.status)) context.events.push({ kind: 'status', side: context.targetSideName, text: `${context.targetName} was ${effect.status === 'paralysis' ? 'paralyzed' : `${effect.status}ed`}!` });
+      if (context.applyStatus(context.target, effect.status)) {
+        const text = effect.status === 'sleep' ? `${context.targetName} fell asleep!` : `${context.targetName} was ${effect.status === 'paralysis' ? 'paralyzed' : effect.status === 'burn' ? 'burned' : effect.status === 'freeze' ? 'frozen' : 'poisoned'}!`;
+        context.events.push({ kind: 'status', side: context.targetSideName, text });
+      }
+      return;
+    }
+    if (effect.kind === 'applyToxic') {
+      if (!chancePass(effect.chance, context.rng)) return;
+      if (context.applyStatus(context.target, 'poison', true)) context.events.push({ kind: 'status', side: context.targetSideName, text: `${context.targetName} was badly poisoned!` });
+      return;
+    }
+    if (effect.kind === 'confuse') {
+      if (!chancePass(effect.chance, context.rng) || (context.target.confusionTurns ?? 0) > 0) return;
+      context.target.confusionTurns = context.rng.int(2, 5);
+      context.events.push({ kind: 'status', side: context.targetSideName, text: `${context.targetName} became confused!` });
       return;
     }
     if (effect.kind === 'modifyStage') {
@@ -115,8 +149,16 @@ export function executeEffects(effects: EffectOperation[], context: EffectContex
         context.events.push({ kind: 'text', side: effect.target === 'self' ? context.actorSideName : context.targetSideName, text: `${target === context.actor ? context.actorName : context.targetName}'s ability prevented the drop!` });
         return;
       }
-      side.stages[effect.stat] = Math.max(-6, Math.min(6, side.stages[effect.stat] + effect.stages));
-      context.events.push({ kind: 'stage', side: effect.target === 'self' ? context.actorSideName : context.targetSideName, text: `${target === context.actor ? context.actorName : context.targetName}'s ${effect.stat.toUpperCase()} shifted!` });
+      const before = side.stages[effect.stat];
+      const after = Math.max(-6, Math.min(6, before + effect.stages));
+      const name = target === context.actor ? context.actorName : context.targetName;
+      if (after === before) {
+        context.events.push({ kind: 'text', side: effect.target === 'self' ? context.actorSideName : context.targetSideName, text: `${name}'s ${effect.stat.toUpperCase()} won't go ${effect.stages > 0 ? 'higher' : 'lower'}!` });
+        return;
+      }
+      side.stages[effect.stat] = after;
+      const intensity = Math.abs(after - before) > 1 ? ' sharply' : '';
+      context.events.push({ kind: 'stage', side: effect.target === 'self' ? context.actorSideName : context.targetSideName, text: `${name}'s ${effect.stat.toUpperCase()} ${effect.stages > 0 ? `rose${intensity}` : `fell${intensity}`}!` });
       return;
     }
     if (effect.kind === 'drain') {

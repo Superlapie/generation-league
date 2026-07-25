@@ -1,10 +1,32 @@
+import type Phaser from 'phaser';
 import type { Direction, TrainerDefinition } from './types';
 
 export const DIRECTION_DELTAS: Record<Direction, [number, number]> = {
   up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0],
 };
 
-export const facingFrame = (direction: Direction) => ({ down: 0, up: 1, left: 2, right: 3 })[direction];
+/** 4x4 sheet: row 0 down, row 1 up, row 2 left, row 3 right. */
+const DIRECTION_FRAME_BASE: Record<Direction, number> = { down: 0, up: 4, left: 8, right: 12 };
+
+export const facingFrame = (direction: Direction) => DIRECTION_FRAME_BASE[direction];
+export const facingFlipX = (_direction: Direction) => false;
+
+export const walkFrames = (direction: Direction) => {
+  const base = DIRECTION_FRAME_BASE[direction];
+  return [base, base + 1, base + 2, base + 3];
+};
+
+export const walkStepFrames = (direction: Direction, phase: 0 | 1): [number, number] => {
+  const frames = walkFrames(direction);
+  return phase === 0 ? [frames[0], frames[1]] : [frames[2], frames[3]];
+};
+
+export const applyFacing = (sprite: Phaser.GameObjects.Sprite, direction: Direction) => {
+  sprite.setFrame(facingFrame(direction));
+  sprite.setFlipX(false);
+  return sprite;
+};
+
 export const oppositeDirection = (direction: Direction): Direction => ({ down: 'up', up: 'down', left: 'right', right: 'left' })[direction] as Direction;
 
 export type CardinalNeighbors = { up: boolean; right: boolean; down: boolean; left: boolean };

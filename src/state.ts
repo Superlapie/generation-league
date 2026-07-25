@@ -8,7 +8,7 @@ const RECOVERY = ['generation-league:recovery:0:v1', 'generation-league:recovery
 const OPTIONS = 'generation-league:options:v1';
 
 interface SaveEnvelope { checksum: string; payload: GameSaveV1 }
-const defaultOptions: GameOptions = { musicVolume: 0.42, sfxVolume: 0.65, muted: false, textSpeed: 'normal', battleScene: true, battleStyle: 'shift', sound: 'stereo', buttonMode: 'normal', frame: 1 };
+const defaultOptions: GameOptions = { musicVolume: 0.42, sfxVolume: 0.65, muted: false, textSpeed: 'normal', battleScene: true, battleStyle: 'shift', sound: 'stereo', buttonMode: 'normal', frame: 1, reducedMotion: false };
 
 function hash(text: string) {
   let value = 2166136261;
@@ -56,10 +56,12 @@ function migrateCreature(input: CreatureInstance, fallbackId: string): CreatureI
     nature: raw.nature && raw.nature.length > 0 ? raw.nature : 'Hardy',
     ability: raw.ability && species.abilities.includes(raw.ability) ? raw.ability : species.abilities[0],
     gender: raw.gender ?? 'unknown', ivs, evs, calculatedStats: ZERO_STATS,
-    currentHp: 1, status: raw.status ?? null, sleepTurns: Math.max(0, Math.floor(raw.sleepTurns ?? 0)),
+    currentHp: 1, status: raw.status ?? null, sleepTurns: Math.max(0, Math.floor(raw.sleepTurns ?? 0)), toxicCounter: Math.max(0, Math.floor(raw.toxicCounter ?? 0)), confusionTurns: raw.confusionTurns === undefined ? undefined : Math.max(0, Math.floor(raw.confusionTurns)),
     friendship: clamp(Math.floor(raw.friendship ?? species.baseHappiness), 0, 255), moves,
     heldItem: raw.heldItem && ITEMS[raw.heldItem] ? raw.heldItem : null, nickname: raw.nickname ?? null,
     capture: { mapId: raw.capture?.mapId ?? 'unknown', originalTrainer: raw.capture?.originalTrainer ?? 'Unknown', caughtAt: raw.capture?.caughtAt ?? 0, metLevel: raw.capture?.metLevel ?? level },
+    personalityValue: Number.isFinite(raw.personalityValue) ? Math.max(0, Math.floor(raw.personalityValue!)) : 0,
+    shiny: raw.shiny === true,
   } as CreatureInstance;
   creature.calculatedStats = calculateStats(creature, species);
   creature.currentHp = clamp(Math.floor(raw.currentHp ?? creature.calculatedStats.hp), 0, creature.calculatedStats.hp);
@@ -79,6 +81,7 @@ function normalizeOptions(input: Partial<GameOptions> | null | undefined): GameO
     sound: raw.sound === 'mono' ? 'mono' : 'stereo',
     buttonMode: raw.buttonMode === 'lr' || raw.buttonMode === 'lEqualsA' ? raw.buttonMode : 'normal',
     frame: clamp(Math.floor(Number(raw.frame ?? 1)), 1, 20),
+    reducedMotion: raw.reducedMotion === true,
   };
 }
 
@@ -133,6 +136,7 @@ export class GameStore {
   setOptions(next: Partial<GameOptions>) {
     if (!this.save) return;
     this.save.options = normalizeOptions({ ...this.save.options, ...next });
+    if (typeof document !== 'undefined') document.body.dataset.reducedMotion = this.save.options.reducedMotion ? 'true' : 'false';
     localStorage.setItem(OPTIONS, JSON.stringify(this.save.options));
   }
   flag(flag: string) { return this.save?.storyFlags.includes(flag) ?? false; }
@@ -165,7 +169,7 @@ export class GameStore {
   }
   healAll() {
     this.save?.party.forEach((creature) => {
-      creature.currentHp = calculateStats(creature, SPECIES[creature.speciesId]).hp; creature.status = null; creature.sleepTurns = 0;
+      creature.currentHp = calculateStats(creature, SPECIES[creature.speciesId]).hp; creature.status = null; creature.sleepTurns = 0; creature.toxicCounter = 0; creature.confusionTurns = undefined;
       creature.moves.forEach((move) => { move.pp = MOVES[move.moveId].pp; });
     });
   }
@@ -175,7 +179,15 @@ export class GameStore {
     const defeated = SPECIES[defeatedSpeciesId];
     const amount = expReward(defeated, defeatedLevel, participants, trainerBattle);
     creature.experience += amount;
-    const messages = [`${creature.nickname || SPECIES[creature.speciesId].name} gained ${amount} EXP!`];
+    if (creature.level < 100) {
+      let evRoom = 510 - Object.values(creature.evs).reduce((sum, value) => sum + value, 0);
+      for (const stat of Object.keys(ZERO_STATS) as Array<keyof Stats>) {
+        const gain = Math.min(defeated.evYield[stat] ?? 0, 255 - creature.evs[stat], evRoom);
+        creature.evs[stat] += gain;
+        evRoom -= gain;
+      }
+    }
+    const messages = [`${creature.nickname || SPECIES[creature.speciesId].name} gained ${amount} EXP!`], pendingMoves: string[] = [];
     while (creature.level < 100 && creature.experience >= expForLevel(creature.level + 1, SPECIES[creature.speciesId].growthCurve)) {
       const oldMax = calculateStats(creature, SPECIES[creature.speciesId]).hp;
       creature.level += 1;
@@ -185,13 +197,28 @@ export class GameStore {
       const moveId = learnableMoveAt(creature.speciesId, creature.level);
       if (moveId) {
           if (creature.moves.length < 4) { creature.moves.push({ moveId, pp: MOVES[moveId].pp, maxPp: MOVES[moveId].pp }); messages.push(`It learned ${MOVES[moveId].name}!`); }
-          else { creature.moves.shift(); creature.moves.push({ moveId, pp: MOVES[moveId].pp, maxPp: MOVES[moveId].pp }); messages.push(`It replaced its oldest move with ${MOVES[moveId].name}!`); }
+          else { pendingMoves.push(moveId); messages.push(`It wants to learn ${MOVES[moveId].name}.`); }
       }
-      const next = evolutionAt(creature.speciesId, creature.level);
-      if (next) { const oldName = SPECIES[creature.speciesId].name; creature.speciesId = next; this.see(next); if (!this.save!.guide.caught.includes(next)) this.save!.guide.caught.push(next); messages.push(`${oldName} evolved into ${SPECIES[next].name}!`); }
     }
     creature.calculatedStats = calculateStats(creature, SPECIES[creature.speciesId]);
-    return messages;
+    return { messages, pendingMoves };
+  }
+  learnMove(creature: CreatureInstance, moveId: string, replaceIndex: number) {
+    const move = MOVES[moveId];
+    if (!move || replaceIndex < 0 || replaceIndex >= creature.moves.length) return false;
+    creature.moves[replaceIndex] = { moveId, pp: move.pp, maxPp: move.pp };
+    return true;
+  }
+  evolveCreature(creature: CreatureInstance, nextSpeciesId: string) {
+    const next = evolutionAt(creature.speciesId, creature.level);
+    if (!this.save || next !== nextSpeciesId) return false;
+    const oldMax = calculateStats(creature, SPECIES[creature.speciesId]).hp;
+    creature.speciesId = next;
+    creature.calculatedStats = calculateStats(creature, SPECIES[next]);
+    creature.currentHp += creature.calculatedStats.hp - oldMax;
+    this.see(next);
+    if (!this.save.guide.caught.includes(next)) this.save.guide.caught.push(next);
+    return true;
   }
 }
 

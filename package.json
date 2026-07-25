@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "start": "vite --host 127.0.0.1",
+    "server": "node server/world-server.mjs",
     "build": "tsc -b && vite build",
     "assets:validate": "node scripts/validate-creature-assets.mjs",
     "check": "npm run assets:validate && tsc -b --pretty false && vitest run",
@@ -13,7 +14,9 @@
     "preview": "vite preview --host 127.0.0.1"
   },
   "dependencies": {
-    "phaser": "4.2.1"
+    "pg": "^8.22.0",
+    "phaser": "4.2.1",
+    "ws": "^8.18.0"
   },
   "devDependencies": {
     "typescript": "5.9.3",

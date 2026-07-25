@@ -60,17 +60,35 @@ export function calculateStats(creature: CreatureInstance, species: SpeciesDefin
 }
 
 const TYPE_CHART: Record<ElementType, Partial<Record<ElementType, number>>> = {
-  Neutral: {}, Verdant: { Tide: 2, Ember: .5, Wind: .5, Verdant: .5 }, Ember: { Verdant: 2, Tide: .5, Ember: .5 },
-  Tide: { Ember: 2, Verdant: .5, Tide: .5 }, Wind: { Verdant: 2, Wind: .5 },
+  Neutral: { Prism: 0 },
+  Verdant: { Tide: 2, Terra: 2, Stone: 2, Ember: .5, Wind: .5, Venom: .5, Bloom: .5, Frost: .5, Metal: .5 },
+  Ember: { Verdant: 2, Frost: 2, Metal: 2, Bloom: 2, Tide: .5, Stone: .5, Terra: .5, Ember: .5, Drake: .5 },
+  Tide: { Ember: 2, Terra: 2, Stone: 2, Verdant: .5, Tide: .5, Volt: .5, Bloom: .5, Drake: .5 },
+  Wind: { Verdant: 2, Venom: 2, Bloom: 2, Volt: .5, Stone: .5, Frost: .5 },
+  Stone: { Ember: 2, Frost: 2, Wind: 2, Bloom: 2, Tide: .5, Verdant: .5, Terra: .5, Metal: .5, Venom: .5 },
+  Frost: { Verdant: 2, Terra: 2, Wind: 2, Drake: 2, Ember: .5, Stone: .5, Metal: .5 },
+  Volt: { Tide: 2, Wind: 2, Terra: 0, Volt: .5, Drake: .5 },
+  Mystic: { Venom: 2, Umbral: 2, Metal: .5, Mystic: .5, Prism: .5 },
+  Umbral: { Mystic: 2, Aether: 2, Bloom: .5, Metal: .5, Umbral: .5 },
+  Drake: { Drake: 2, Metal: .5, Frost: .5, Aether: .5 },
+  Metal: { Frost: 2, Stone: 2, Prism: 2, Ember: .5, Tide: .5, Terra: .5, Volt: .5 },
+  Venom: { Verdant: 2, Bloom: 2, Terra: .5, Mystic: .5, Stone: .5, Venom: .5 },
+  Terra: { Ember: 2, Volt: 2, Venom: 2, Stone: 2, Metal: 2, Tide: .5, Verdant: .5, Frost: .5, Wind: 0, Bloom: .5 },
+  Bloom: { Verdant: 2, Mystic: 2, Umbral: 2, Ember: .5, Wind: .5, Stone: .5, Metal: .5, Frost: .5 },
+  Aether: { Drake: 2, Umbral: 2, Metal: .5, Venom: .5 },
+  Prism: { Mystic: 2, Umbral: 2, Neutral: 2, Metal: .5, Prism: .5 },
 };
 
+const PHYSICAL_TYPES = new Set<ElementType>(['Neutral', 'Verdant', 'Wind', 'Stone', 'Venom', 'Terra', 'Bloom', 'Prism']);
+
 export function typeEffectiveness(attack: ElementType, defending: SpeciesDefinition) { return defending.types.reduce((value, type) => type ? value * (TYPE_CHART[attack][type] ?? 1) : value, 1); }
-export function gen3Category(type: ElementType): 'Physical' | 'Special' { return type === 'Ember' || type === 'Tide' ? 'Special' : 'Physical'; }
+export function gen3Category(type: ElementType): 'Physical' | 'Special' { return PHYSICAL_TYPES.has(type) ? 'Physical' : 'Special'; }
 export function stageMultiplier(stage: number) { const value = clamp(stage, -6, 6); return value >= 0 ? (2 + value) / 2 : 2 / (2 - value); }
+export function accuracyStageMultiplier(stage: number) { const value = clamp(stage, -6, 6); return value >= 0 ? (3 + value) / 3 : 3 / (3 - value); }
 
 export function accuracyCheck(move: MoveDefinition, attacker: BattleSide, defender: BattleSide, rng: Rng) {
   if (move.accuracy <= 0) return true;
-  const chance = clamp(move.accuracy * stageMultiplier(attacker.stages.accuracy) / stageMultiplier(defender.stages.evasion), 1, 100);
+  const chance = clamp(move.accuracy * accuracyStageMultiplier(attacker.stages.accuracy) / accuracyStageMultiplier(defender.stages.evasion), 1, 100);
   return rng.next() * 100 < chance;
 }
 
@@ -90,8 +108,24 @@ export function damageRoll(attacker: CreatureInstance, defender: CreatureInstanc
 
 export function expForLevel(level: number, curve: SpeciesDefinition['growthCurve']) { return curve === 'fast' ? Math.floor(4 * level ** 3 / 5) : curve === 'slow' ? Math.floor(5 * level ** 3 / 4) : level ** 3; }
 export function expReward(species: SpeciesDefinition, level: number, participants = 1, trainer = false) { return Math.max(1, Math.floor((species.baseExp * level * (trainer ? 1.5 : 1)) / 7 / Math.max(1, participants))); }
+export function captureResult(target: CreatureInstance, species: SpeciesDefinition, maxHp: number, itemModifier: number, rng: Rng) {
+  const statusBonus = target.status === 'sleep' ? 2 : target.status ? 1.5 : 1;
+  const rate = Math.max(1, Math.floor(((3 * maxHp - 2 * target.currentHp) * species.captureRate * itemModifier * statusBonus) / (3 * maxHp)));
+  if (rate >= 255) return { caught: true, shakes: 3 };
+  const threshold = Math.floor(1048560 / Math.sqrt(Math.sqrt(Math.floor(16711680 / rate))));
+  for (let shakes = 0; shakes < 4; shakes += 1) if (rng.next() * 65536 >= threshold) return { caught: false, shakes: Math.min(3, shakes) };
+  return { caught: true, shakes: 3 };
+}
+
 export function captureChance(target: CreatureInstance, species: SpeciesDefinition, maxHp: number, itemModifier: number, rng: Rng) {
-  const statusBonus = target.status === 'sleep' ? 2 : target.status ? 1.5 : 1; const a = ((3 * maxHp - 2 * target.currentHp) * species.captureRate * itemModifier * statusBonus) / (3 * maxHp); return rng.next() < clamp(a / 255, .02, .95);
+  return captureResult(target, species, maxHp, itemModifier, rng).caught;
+}
+
+export function escapeSucceeds(player: CreatureInstance, enemy: CreatureInstance, playerSpecies: SpeciesDefinition, enemySpecies: SpeciesDefinition, attempts: number, rng: Rng) {
+  const playerSpeed = calculateStats(player, playerSpecies).speed, enemySpeed = calculateStats(enemy, enemySpecies).speed;
+  if (playerSpeed >= enemySpeed) return true;
+  const odds = (Math.floor(playerSpeed * 128 / Math.max(1, enemySpeed)) + 30 * Math.max(1, attempts)) % 256;
+  return rng.int(0, 255) < odds;
 }
 
 function displayName(creature: CreatureInstance, species: SpeciesDefinition) { return creature.nickname || species.name; }
@@ -105,7 +139,8 @@ function speed(side: BattleSide, species: SpeciesDefinition, field: MoveDefiniti
 export function chooseTrainerAction(context: BattleContext, species: Record<string, SpeciesDefinition>, moves: Record<string, MoveDefinition>, rng: Rng): BattleAction {
   const side = context.enemy; const foe = context.player; const creature = active(side); const foeCreature = active(foe); const creatureSpecies = species[creature.speciesId]; const foeSpecies = species[foeCreature.speciesId];
   const hpRatio = creature.currentHp / calculateStats(creature, creatureSpecies).hp; const viable = creature.moves.map((known, index) => ({ known, index, move: moves[known.moveId] })).filter((entry) => entry.known.pp > 0);
-  let best = viable[0]?.index ?? 0; let bestScore = -Infinity;
+  if (!viable.length) return { kind: 'struggle' };
+  let best = viable[0].index; let bestScore = -Infinity;
   for (const entry of viable) {
     const effects = moveEffects(entry.move); let score = entry.move.power * typeEffectiveness(entry.move.type, foeSpecies) * (entry.move.accuracy / 100);
     if (effects.some((effect) => effect.kind === 'applyStatus') && foeCreature.status) score *= .4;
@@ -118,12 +153,29 @@ export function chooseTrainerAction(context: BattleContext, species: Record<stri
   return { kind: 'move', moveIndex: best };
 }
 
-function actionPriority(action: BattleAction, side: BattleSide, moveMap: Record<string, MoveDefinition>) { return action.kind === 'move' ? moveMap[active(side).moves[action.moveIndex]?.moveId]?.priority ?? 0 : 6; }
-function canAct(creature: CreatureInstance, name: string, sideName: 'player' | 'enemy', rng: Rng, events: BattleEvent[]) {
+function actionPriority(action: BattleAction, side: BattleSide, moveMap: Record<string, MoveDefinition>) { return action.kind === 'move' ? moveMap[active(side).moves[action.moveIndex]?.moveId]?.priority ?? 0 : action.kind === 'struggle' ? 0 : 6; }
+function confusionDamage(creature: CreatureInstance, species: SpeciesDefinition, rng: Rng) {
+  const stats = calculateStats(creature, species);
+  const base = Math.floor(Math.floor(Math.floor((2 * creature.level / 5 + 2) * 40 * stats.attack / Math.max(1, stats.defense)) / 50) + 2);
+  return Math.max(1, Math.floor((base * (217 + Math.floor(rng.next() * 39))) / 255));
+}
+function canAct(creature: CreatureInstance, species: SpeciesDefinition, name: string, sideName: 'player' | 'enemy', rng: Rng, events: BattleEvent[]) {
   if (creature.status === 'sleep') { if (creature.sleepTurns > 0) { creature.sleepTurns -= 1; events.push({ kind: 'status', side: sideName, text: `${name} is fast asleep.` }); return false; } creature.status = null; events.push({ kind: 'status', side: sideName, text: `${name} woke up!` }); }
+  if (creature.status === 'freeze') { if (rng.next() < .2) { creature.status = null; events.push({ kind: 'status', side: sideName, text: `${name} thawed out!` }); } else { events.push({ kind: 'status', side: sideName, text: `${name} is frozen solid.` }); return false; } }
+  if ((creature.confusionTurns ?? 0) > 0) {
+    creature.confusionTurns = Math.max(0, (creature.confusionTurns ?? 0) - 1);
+    if (rng.next() < .5) {
+      const amount = Math.min(creature.currentHp, confusionDamage(creature, species, rng));
+      creature.currentHp -= amount;
+      events.push({ kind: 'damage', side: sideName, amount, text: `${name} hurt itself in its confusion!` });
+      if (!alive(creature)) events.push({ kind: 'faint', side: sideName, text: `${name} fainted!` });
+      return false;
+    }
+    events.push({ kind: 'status', side: sideName, text: `${name} is confused!` });
+  } else if (creature.confusionTurns === 0) { creature.confusionTurns = undefined; events.push({ kind: 'status', side: sideName, text: `${name} snapped out of confusion!` }); }
   if (creature.status === 'paralysis' && rng.next() < .25) { events.push({ kind: 'status', side: sideName, text: `${name} is paralyzed!` }); return false; } return true;
 }
-function applyStatus(target: CreatureInstance, status: Exclude<MajorStatus, null>, rng: Rng) { if (target.status) return false; target.status = status; if (status === 'sleep') target.sleepTurns = rng.int(1, 3); return true; }
+function applyStatus(target: CreatureInstance, status: Exclude<MajorStatus, null>, rng: Rng, toxic = false) { if (target.status) return false; target.status = status; target.toxicCounter = toxic ? 1 : 0; if (status === 'sleep') target.sleepTurns = rng.int(1, 4); return true; }
 
 export function resolveTurn(context: BattleContext, playerAction: BattleAction, enemyAction: BattleAction, species: Record<string, SpeciesDefinition>, moves: Record<string, MoveDefinition>, rng: Rng): BattleEvent[] {
   const events: BattleEvent[] = [];
@@ -138,11 +190,12 @@ export function resolveTurn(context: BattleContext, playerAction: BattleAction, 
   for (const turn of pairs) {
     if (context.ended || !alive(active(turn.side))) continue;
     const actor = active(turn.side); const actorSpecies = species[actor.speciesId]; const actorName = displayName(actor, actorSpecies); const target = active(turn.foe); const targetSpecies = species[target.speciesId]; const targetName = displayName(target, targetSpecies);
-    if (turn.action.kind === 'move' && turn.side.participants && !turn.side.participants.includes(actor.uid)) turn.side.participants.push(actor.uid);
-    if (turn.action.kind === 'switch') { const next = turn.side.party[turn.action.partyIndex]; if (next && alive(next) && turn.action.partyIndex !== turn.side.active) { turn.side.active = turn.action.partyIndex; turn.side.stages = { ...BASE_STAGES }; events.push({ kind: 'switch', side: turn.name, text: `${turn.name === 'player' ? 'Go' : 'The foe sent out'} ${displayName(next, species[next.speciesId])}!` }); } continue; }
-    if (turn.action.kind !== 'move' || turn.action.moveIndex < 0 || turn.action.moveIndex >= actor.moves.length || !canAct(actor, actorName, turn.name, rng, events)) continue;
-    const known = actor.moves[turn.action.moveIndex]; const move = known && moves[known.moveId]; if (!move || known.pp <= 0) { events.push({ kind: 'text', side: turn.name, text: `${actorName} has no PP left!` }); continue; }
-    known.pp -= 1; events.push({ kind: 'move', side: turn.name, moveId: move.id, text: `${actorName} used ${move.name}!` });
+    if ((turn.action.kind === 'move' || turn.action.kind === 'struggle') && turn.side.participants && !turn.side.participants.includes(actor.uid)) turn.side.participants.push(actor.uid);
+    if (turn.action.kind === 'switch') { const next = turn.side.party[turn.action.partyIndex]; if (next && alive(next) && turn.action.partyIndex !== turn.side.active) { turn.side.active = turn.action.partyIndex; turn.side.stages = { ...BASE_STAGES }; if(turn.name==='player'&&turn.side.participants&&!turn.side.participants.includes(next.uid))turn.side.participants.push(next.uid);events.push({ kind: 'switch', side: turn.name, text: `${turn.name === 'player' ? 'Go' : 'The foe sent out'} ${displayName(next, species[next.speciesId])}!` }); } continue; }
+    if (turn.action.kind !== 'move' && turn.action.kind !== 'struggle' || !canAct(actor, actorSpecies, actorName, turn.name, rng, events)) continue;
+    const known = turn.action.kind === 'move' ? actor.moves[turn.action.moveIndex] : undefined; const move = turn.action.kind === 'struggle' ? moves.struggle : known && moves[known.moveId];
+    if (!move || turn.action.kind === 'move' && (!known || known.pp <= 0)) { events.push({ kind: 'text', side: turn.name, text: `${actorName} has no PP left!` }); continue; }
+    if (known) known.pp -= 1; events.push({ kind: 'move', side: turn.name, moveId: move.id, text: `${actorName} used ${move.name}!` });
     if (!accuracyCheck(move, turn.side, turn.foe, rng)) { events.push({ kind: 'miss', side: turn.name, text: 'But it missed!' }); continue; }
     const effects = moveEffects(move); const hasProtect = effects.some((effect) => effect.kind === 'protect');
     if (!hasProtect) turn.side.protectStreak = 0;
@@ -152,7 +205,7 @@ export function resolveTurn(context: BattleContext, playerAction: BattleAction, 
       actorSideName: turn.name, targetSideName: turn.foeName, field: context.field, rng, events,
       maxHp: (creature, creatureSpecies) => calculateStats(creature, creatureSpecies).hp,
       damage: (effectiveMove) => damageRoll(actor, target, effectiveMove, actorSpecies, targetSpecies, turn.side.stages, turn.foe.stages, rng, context.field.effect),
-      applyStatus: (creature, status) => applyStatus(creature, status, rng), canLowerStage: (creature) => !preventsStageChange(creature, move, -1),
+      applyStatus: (creature, status, toxic) => applyStatus(creature, status, rng, toxic), canLowerStage: (creature) => !preventsStageChange(creature, move, -1),
     });
     if (summary.lastEffectiveness > 1) events.push({ kind: 'text', text: 'It is super effective!' });
     if (summary.lastEffectiveness < 1) events.push({ kind: 'text', text: 'It is not very effective…' });
@@ -161,7 +214,7 @@ export function resolveTurn(context: BattleContext, playerAction: BattleAction, 
   }
   for (const [name, side] of [['player', context.player], ['enemy', context.enemy]] as const) {
     const creature = active(side); if (!alive(creature)) continue; const creatureName = displayName(creature, species[creature.speciesId]);
-    if (creature.status === 'burn' || creature.status === 'poison') { const amount = Math.max(1, Math.floor(calculateStats(creature, species[creature.speciesId]).hp / 8)); creature.currentHp = Math.max(0, creature.currentHp - amount); events.push({ kind: 'damage', side: name, amount, text: `${creatureName} is hurt by ${creature.status}!` }); if (!alive(creature)) events.push({ kind: 'faint', side: name, text: `${creatureName} fainted!` }); }
+    if (creature.status === 'burn' || creature.status === 'poison') { const maxHp = calculateStats(creature, species[creature.speciesId]).hp; const toxic = creature.status === 'poison' && creature.toxicCounter > 0; const amount = toxic ? Math.max(1, Math.floor(maxHp * creature.toxicCounter / 16)) : Math.max(1, Math.floor(maxHp / 8)); creature.currentHp = Math.max(0, creature.currentHp - amount); if (toxic) creature.toxicCounter = Math.min(15, creature.toxicCounter + 1); events.push({ kind: 'damage', side: name, amount, text: `${creatureName} is hurt by ${creature.status}!` }); if (!alive(creature)) events.push({ kind: 'faint', side: name, text: `${creatureName} fainted!` }); }
     if (creature.status && resolveEndTurn(creature, rng)) events.push({ kind: 'status', side: name, text: `${creatureName}'s ability cured its status!` });
   }
   if (context.field.turns > 0 && --context.field.turns === 0) { context.field.effect = null; events.push({ kind: 'field', text: 'The field returned to normal.' }); }

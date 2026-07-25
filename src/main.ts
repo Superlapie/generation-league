@@ -6,6 +6,7 @@ import { TitleScene } from './scenes/TitleScene';
 import { IntroScene } from './scenes/IntroScene';
 import { OverworldScene } from './scenes/OverworldScene';
 import { BattleScene } from './scenes/BattleScene';
+import { DoubleBattleScene } from './scenes/DoubleBattleScene';
 import { MenuScene } from './scenes/MenuScene';
 import { CreditsScene } from './scenes/CreditsScene';
 import { gameStore } from './state';
@@ -26,7 +27,8 @@ const game = new Phaser.Game({
   scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH, width: 480, height: 320 },
   input: { keyboard: false, mouse: true, touch: true },
   audio: { disableWebAudio: false },
-  scene: [BootScene,TitleScene,IntroScene,OverworldScene,BattleScene,MenuScene,CreditsScene],
+  dom: { createContainer: true },
+  scene: [BootScene,TitleScene,IntroScene,OverworldScene,BattleScene,DoubleBattleScene,MenuScene,CreditsScene],
 });
 
 window.addEventListener('beforeunload',()=>{

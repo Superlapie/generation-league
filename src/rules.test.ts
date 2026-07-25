@@ -5,7 +5,7 @@ import { AUDIO_CUES } from './audio';
 import { MOVE_PRESENTATIONS } from './presentation';
 import { validateTriggerRegistry } from './triggers';
 import { MAPS, validateWorld } from './maps';
-import { BASE_STAGES, calculateStats, captureChance, chooseTrainerAction, damageRoll, expForLevel, resolveTurn, sanitizeEvs, SeededRng, typeEffectiveness } from './rules';
+import { accuracyStageMultiplier, BASE_STAGES, calculateStats, captureChance, captureResult, chooseTrainerAction, damageRoll, escapeSucceeds, expForLevel, resolveTurn, sanitizeEvs, SeededRng, typeEffectiveness } from './rules';
 import type { Rng } from './rules';
 import type { BattleContext } from './types';
 
@@ -86,10 +86,35 @@ describe('generation-style progression rules',()=>{
     const high=damageRoll(a,d,MOVES.cinderspit,SPECIES.cinderskink,SPECIES.cragbud,{...BASE_STAGES},{...BASE_STAGES},fixedRng(.99));
     expect(low.effectiveness).toBe(2);expect(high.damage).toBeGreaterThan(low.damage);
   });
+  it('uses Generation III accuracy stages and speed-based escape attempts',()=>{
+    expect(accuracyStageMultiplier(1)).toBeCloseTo(4/3);expect(accuracyStageMultiplier(-1)).toBeCloseTo(3/4);
+    const fast=createCreature('breezlet',20,'Test','test',new SeededRng(21)),slow=createCreature('cragbud',20,'Test','test',new SeededRng(22));
+    expect(escapeSucceeds(fast,slow,SPECIES.breezlet,SPECIES.cragbud,1,{next:()=>.99,int:(_min,max)=>max})).toBe(true);
+    expect(escapeSucceeds(slow,fast,SPECIES.cragbud,SPECIES.breezlet,1,{next:()=>.99,int:(_min,max)=>max})).toBe(false);
+  });
   it('resolves priority, PP, damage, status and end-of-turn timing through one engine',()=>{
     const battle=contextFor('cragbud','jellume');battle.player.party[0].moves=[{moveId:'quickstep',pp:5,maxPp:5}];battle.enemy.party[0].moves=[{moveId:'prismsting',pp:5,maxPp:5}];
     const events=resolveTurn(battle,{kind:'move',moveIndex:0},{kind:'move',moveIndex:0},SPECIES,MOVES,fixedRng(.01));
     expect(events.find((event)=>event.kind==='move')?.side).toBe('player');expect(battle.player.party[0].moves[0].pp).toBe(4);expect(battle.enemy.party[0].currentHp).toBeLessThan(calculateStats(battle.enemy.party[0],SPECIES.jellume).hp);
+  });
+  it('escalates toxic damage and resolves confusion self-hit deterministically',()=>{
+    const toxicBattle=contextFor('cragbud','jellume');
+    toxicBattle.player.party[0].moves=[{moveId:'venomseal',pp:2,maxPp:2}];
+    toxicBattle.enemy.party[0].moves=[{moveId:'quickstep',pp:2,maxPp:2}];
+    const toxicMax=calculateStats(toxicBattle.enemy.party[0],SPECIES.jellume).hp;
+    resolveTurn(toxicBattle,{kind:'move',moveIndex:0},{kind:'move',moveIndex:0},SPECIES,MOVES,fixedRng(.01));
+    expect(toxicBattle.enemy.party[0].status).toBe('poison');expect(toxicBattle.enemy.party[0].toxicCounter).toBe(2);expect(toxicBattle.enemy.party[0].currentHp).toBeLessThan(toxicMax);
+    const afterFirst=toxicBattle.enemy.party[0].currentHp;
+    resolveTurn(toxicBattle,{kind:'move',moveIndex:0},{kind:'move',moveIndex:0},SPECIES,MOVES,fixedRng(.01));
+    expect(toxicBattle.enemy.party[0].toxicCounter).toBe(3);expect(toxicBattle.enemy.party[0].currentHp).toBeLessThan(afterFirst);
+
+    const confusedBattle=contextFor('cragbud','jellume');
+    confusedBattle.player.party[0].moves=[{moveId:'mindshiver',pp:2,maxPp:2}];
+    confusedBattle.enemy.party[0].moves=[{moveId:'quickstep',pp:2,maxPp:2}];
+    resolveTurn(confusedBattle,{kind:'move',moveIndex:0},{kind:'move',moveIndex:0},SPECIES,MOVES,fixedRng(.01));
+    const confusedHp=confusedBattle.enemy.party[0].currentHp;
+    const events=resolveTurn(confusedBattle,{kind:'move',moveIndex:0},{kind:'move',moveIndex:0},SPECIES,MOVES,fixedRng(.01));
+    expect(confusedBattle.enemy.party[0].confusionTurns).toBe(1);expect(confusedBattle.enemy.party[0].currentHp).toBeLessThan(confusedHp);expect(events.some((event)=>event.text.includes('hurt itself'))).toBe(true);
   });
   it('replaces a fainted player creature without granting the enemy another attack',()=>{
     const battle=contextFor('cragbud','jellume'),replacement=createCreature('cinderskink',20,'Test','test',new SeededRng(8));battle.player.party.push(replacement);battle.player.party[0].currentHp=0;battle.enemy.party[0].moves=[{moveId:'prismsting',pp:5,maxPp:5}];battle.field={effect:'monsoon',turns:3};
@@ -103,10 +128,13 @@ describe('generation-style progression rules',()=>{
   });
   it('uses HP, status, capture rate and item modifier for capture probability',()=>{
     const creature=createCreature('gildig',8,'Wild','route',new SeededRng(7)),max=calculateStats(creature,SPECIES.gildig).hp;creature.currentHp=1;creature.status='sleep';
-    expect(captureChance(creature,SPECIES.gildig,max,1.5,fixedRng(.01))).toBe(true);expect(captureChance(creature,SPECIES.gildig,max,1,fixedRng(.99))).toBe(false);
+    expect(captureChance(creature,SPECIES.gildig,max,1.5,fixedRng(.01))).toBe(true);
+    creature.currentHp=max;creature.status=null;
+    expect(captureChance(creature,SPECIES.gildig,max,1,fixedRng(.99))).toBe(false);expect(captureResult(creature,SPECIES.gildig,max,1,fixedRng(.99))).toEqual({caught:false,shakes:0});
   });
   it('trainer AI evaluates available damage and does not choose exhausted moves',()=>{
     const battle=contextFor('cragbud','cinderskink');battle.enemy.party[0].moves=[{moveId:'embernip',pp:0,maxPp:25},{moveId:'cinderspit',pp:10,maxPp:20},{moveId:'smokeshroud',pp:10,maxPp:20}];
     const action=chooseTrainerAction(battle,SPECIES,MOVES,fixedRng(.5));expect(action.kind).toBe('move');if(action.kind==='move')expect(action.moveIndex).not.toBe(0);
+    battle.enemy.party[0].moves.forEach((move)=>{move.pp=0;});expect(chooseTrainerAction(battle,SPECIES,MOVES,fixedRng(.5))).toEqual({kind:'struggle'});
   });
 });

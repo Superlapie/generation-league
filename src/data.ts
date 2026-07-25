@@ -38,6 +38,7 @@ const CREATURE_META: Record<string, { regionalNumber: number; category: string; 
 };
 
 export const MOVES: Record<string, MoveDefinition> = {
+  struggle: { id: 'struggle', name: 'Struggle', type: 'Neutral', power: 50, accuracy: 100, pp: 1, priority: 0, target: 'foe', category: 'Physical', effects: [{ kind: 'damage' }, { kind: 'recoil', ratio: .25 }], animation: 'impact', audioCue: 'thud', description: 'A desperate attack used when no PP remains.' },
   nudge: { id: 'nudge', name: 'Nudge', type: 'Neutral', power: 40, accuracy: 100, pp: 35, priority: 0, target: 'foe', category: 'Physical', effect: 'damage', animation: 'impact', audioCue: 'thud', description: 'A reliable body check.' },
   quickstep: { id: 'quickstep', name: 'Quickstep', type: 'Wind', power: 40, accuracy: 100, pp: 30, priority: 1, target: 'foe', category: 'Physical', effect: 'priority', animation: 'slash', audioCue: 'slice', description: 'A darting strike that acts first.' },
   harden: { id: 'harden', name: 'Stone Poise', type: 'Neutral', power: 0, accuracy: 0, pp: 30, priority: 0, target: 'self', category: 'Status', effect: 'raise', stat: 'defense', stages: 1, animation: 'guard', audioCue: 'shine', description: 'Raises Defense.' },
@@ -77,6 +78,22 @@ export const MOVES: Record<string, MoveDefinition> = {
   wickertrap: { id: 'wickertrap', name: 'Wicker Trap', type: 'Verdant', power: 0, accuracy: 90, pp: 15, priority: 0, target: 'foe', category: 'Status', effect: 'paralyze', effectStatus: 'paralysis', effectChance: 100, animation: 'vines', audioCue: 'vine', description: 'A woven trap paralyzes the foe.' },
   tailwind: { id: 'tailwind', name: 'Tailwind', type: 'Wind', power: 0, accuracy: 0, pp: 10, priority: 0, target: 'self', category: 'Status', effect: 'weather', field: 'tailwind', animation: 'wind', audioCue: 'gust', description: 'Whips up a speed-favoring wind.' },
   bramblewheel: { id: 'bramblewheel', name: 'Bramble Wheel', type: 'Verdant', power: 90, accuracy: 90, pp: 10, priority: 0, target: 'foe', category: 'Physical', effect: 'recoil', ratio: 0.2, animation: 'bramble-wheel', audioCue: 'leaf-heavy', description: 'A thorned wheel crashes into the foe.' },
+
+  frostbite: { id: 'frostbite', name: 'Frostbite', type: 'Frost', power: 55, accuracy: 95, pp: 20, priority: 0, target: 'foe', category: 'Special', effect: 'freeze', effectStatus: 'freeze', effectChance: 10, animation: 'prism', audioCue: 'chime', description: 'A sharp cold ray that may freeze.' },
+  stonefall: { id: 'stonefall', name: 'Stonefall', type: 'Stone', power: 60, accuracy: 95, pp: 20, priority: 0, target: 'foe', category: 'Physical', effect: 'damage', animation: 'rocks', audioCue: 'rock', description: 'Drops a focused volley of stone.' },
+  voltflash: { id: 'voltflash', name: 'Voltflash', type: 'Volt', power: 60, accuracy: 100, pp: 20, priority: 0, target: 'foe', category: 'Special', effect: 'paralyze', effectStatus: 'paralysis', effectChance: 15, animation: 'beam', audioCue: 'beam', description: 'A bright current that may paralyze.' },
+  mindbloom: { id: 'mindbloom', name: 'Mindbloom', type: 'Mystic', power: 70, accuracy: 100, pp: 15, priority: 0, target: 'foe', category: 'Special', effect: 'damage', animation: 'aura', audioCue: 'shine', description: 'A focused thought becomes a blooming wave.' },
+  umbralcut: { id: 'umbralcut', name: 'Umbral Cut', type: 'Umbral', power: 70, accuracy: 100, pp: 15, priority: 0, target: 'foe', category: 'Physical', effect: 'damage', animation: 'slash', audioCue: 'slice', description: 'A clean strike from the edge of shadow.' },
+  drakepulse: { id: 'drakepulse', name: 'Drake Pulse', type: 'Drake', power: 80, accuracy: 100, pp: 10, priority: 0, target: 'foe', category: 'Special', effect: 'damage', animation: 'beam', audioCue: 'beam', description: 'A resonant pulse from an ancient line.' },
+  metalguard: { id: 'metalguard', name: 'Metal Guard', type: 'Metal', power: 0, accuracy: 0, pp: 20, priority: 0, target: 'self', category: 'Status', effect: 'raise', stat: 'defense', stages: 1, animation: 'guard', audioCue: 'rock', description: 'Raises Defense behind a hard shell.' },
+  venomlash: { id: 'venomlash', name: 'Venom Lash', type: 'Venom', power: 65, accuracy: 100, pp: 20, priority: 0, target: 'foe', category: 'Physical', effect: 'poison', effectStatus: 'poison', effectChance: 20, animation: 'whip', audioCue: 'vine', description: 'A toxic lash that may poison.' },
+  terraslam: { id: 'terraslam', name: 'Terra Slam', type: 'Terra', power: 75, accuracy: 100, pp: 15, priority: 0, target: 'foe', category: 'Physical', effect: 'damage', animation: 'dust-burst', audioCue: 'rumble', description: 'A grounded impact that shakes the field.' },
+  bloomflare: { id: 'bloomflare', name: 'Bloomflare', type: 'Bloom', power: 70, accuracy: 100, pp: 15, priority: 0, target: 'foe', category: 'Physical', effect: 'damage', animation: 'leaves', audioCue: 'leaf-heavy', description: 'A bright burst of petals and pollen.' },
+  aetherglow: { id: 'aetherglow', name: 'Aether Glow', type: 'Aether', power: 70, accuracy: 100, pp: 15, priority: 0, target: 'foe', category: 'Special', effect: 'damage', animation: 'aura', audioCue: 'shine', description: 'A clear beam that bends around the foe.' },
+  prismbeam: { id: 'prismbeam', name: 'Prism Beam', type: 'Prism', power: 85, accuracy: 90, pp: 10, priority: 0, target: 'foe', category: 'Special', effect: 'damage', animation: 'beam', audioCue: 'beam', description: 'Splits light into a precise multicolor strike.' },
+  venomseal: { id: 'venomseal', name: 'Venom Seal', type: 'Venom', power: 0, accuracy: 90, pp: 10, priority: 0, target: 'foe', category: 'Status', effect: 'toxic', animation: 'prism', audioCue: 'chime', description: 'Marks the foe with escalating venom.' },
+  mindshiver: { id: 'mindshiver', name: 'Mindshiver', type: 'Mystic', power: 0, accuracy: 100, pp: 20, priority: 0, target: 'foe', category: 'Status', effect: 'confuse', animation: 'aura', audioCue: 'chime', description: 'Scrambles the foe\'s focus.' },
+  bloomwhorl: { id: 'bloomwhorl', name: 'Bloom Whorl', type: 'Bloom', power: 55, accuracy: 100, pp: 15, priority: 0, target: 'allFoes', category: 'Physical', effect: 'damage', animation: 'briars', audioCue: 'leaf', description: 'A wide spiral of petals strikes every foe.' },
 };
 
 // Materialize the declarative operation list once so the battle engine never
@@ -158,11 +175,15 @@ export function createCreature(speciesId: string, level: number, trainer: string
   const creature: CreatureInstance = {
     uid: `${speciesId}-${Date.now().toString(36)}-${rng.int(1000,9999)}`,
     speciesId, level, experience: expForLevel(level, definition.growthCurve), nature: NATURES[rng.int(0, NATURES.length - 1)],
-    ability: definition.abilities[rng.int(0, definition.abilities.length - 1)], gender: 'unknown', ivs: randomStats(), evs: { ...ZERO_STATS },
-    calculatedStats: { ...ZERO_STATS }, currentHp: 1, status: null, sleepTurns: 0, friendship: definition.baseHappiness,
+    ability: definition.abilities[rng.int(0, definition.abilities.length - 1)], gender: rng.next() < .5 ? 'female' : 'male', ivs: randomStats(), evs: { ...ZERO_STATS },
+    calculatedStats: { ...ZERO_STATS }, currentHp: 1, status: null, sleepTurns: 0, toxicCounter: 0, friendship: definition.baseHappiness,
     moves: knownIds.map((moveId) => ({ moveId, pp: MOVES[moveId].pp, maxPp: MOVES[moveId].pp })), heldItem: null, nickname: null,
     capture: { mapId, originalTrainer: trainer, caughtAt: Date.now(), metLevel: level },
+    personalityValue: Math.floor(rng.next() * 0x100000000) >>> 0,
+    shiny: false,
   };
+  const trainerHash = [...trainer].reduce((value, character) => ((value * 31) ^ character.charCodeAt(0)) >>> 0, 2166136261);
+  creature.shiny = (((creature.personalityValue >>> 16) ^ (creature.personalityValue & 0xffff) ^ (trainerHash >>> 16) ^ (trainerHash & 0xffff)) & 0x0fff) === 0;
   creature.calculatedStats = calculateStats(creature, definition); creature.currentHp = creature.calculatedStats.hp;
   return creature;
 }

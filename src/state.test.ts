@@ -22,4 +22,29 @@ describe('versioned save recovery',()=>{
     store.save!.money=999;expect(store.manualSave()).toBe(true);localStorage.setItem('generation-league:manual:v1','{corrupted');
     const restored=new GameStore();expect(restored.continueGame()).toBe(true);expect(restored.save?.player.name).toBe('MIRA');
   });
+  it('defers evolution until the presentation flow confirms it',()=>{
+    const store=new GameStore();store.newGame({name:'ACE',avatar:'a',starter:'cragbud'});
+    const creature=store.save!.party[0];creature.level=16;
+    expect(creature.speciesId).toBe('cragbud');
+    expect(store.evolveCreature(creature,'mossolith')).toBe(true);
+    expect(creature.speciesId).toBe('mossolith');
+    expect(store.save!.guide.caught).toContain('mossolith');
+  });
+  it('awards defeated-creature EV yields without exceeding Gen III caps',()=>{
+    const store=new GameStore();store.newGame({name:'ACE',avatar:'a',starter:'cragbud'});
+    const creature=store.save!.party[0],before=Object.values(creature.evs).reduce((sum,value)=>sum+value,0);
+    store.awardExperience(creature,'jellume',5);
+    expect(Object.values(creature.evs).reduce((sum,value)=>sum+value,0)).toBeGreaterThan(before);
+    creature.evs={hp:255,attack:255,defense:0,spAttack:0,spDefense:0,speed:0};
+    store.awardExperience(creature,'jellume',5);
+    expect(Object.values(creature.evs).reduce((sum,value)=>sum+value,0)).toBe(510);
+  });
+  it('keeps inventory counts consistent when adding and consuming stacks',()=>{
+    const store=new GameStore();store.newGame({name:'ACE',avatar:'a',starter:'cragbud'});
+    const before=store.countItem('tonic');store.addItem('tonic',3);
+    expect(store.countItem('tonic')).toBe(before+3);
+    expect(store.useItem('tonic',2)).toBe(true);
+    expect(store.countItem('tonic')).toBe(before+1);
+    expect(store.useItem('tonic',999)).toBe(false);
+  });
 });

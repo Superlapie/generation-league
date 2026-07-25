@@ -1,8 +1,12 @@
-export type ElementType = 'Verdant' | 'Ember' | 'Tide' | 'Wind' | 'Neutral';
+export const ELEMENT_TYPES = [
+  'Neutral', 'Verdant', 'Ember', 'Tide', 'Wind', 'Stone', 'Frost', 'Volt', 'Mystic',
+  'Umbral', 'Drake', 'Metal', 'Venom', 'Terra', 'Bloom', 'Aether', 'Prism',
+] as const;
+export type ElementType = typeof ELEMENT_TYPES[number];
 export type MoveCategory = 'Physical' | 'Special' | 'Status';
 export type StatName = 'hp' | 'attack' | 'defense' | 'spAttack' | 'spDefense' | 'speed';
 export type BattleStat = Exclude<StatName, 'hp'> | 'accuracy' | 'evasion';
-export type MajorStatus = 'burn' | 'poison' | 'paralysis' | 'sleep' | null;
+export type MajorStatus = 'burn' | 'poison' | 'paralysis' | 'sleep' | 'freeze' | null;
 export type GrowthCurve = 'fast' | 'medium' | 'slow';
 
 export interface Stats {
@@ -46,6 +50,8 @@ export interface SpeciesDefinition {
 
 export type FieldEffect = 'sunshower' | 'tailwind' | 'monsoon' | 'cinderfall';
 export type EffectOperation =
+  | { kind: 'applyToxic'; chance?: number }
+  | { kind: 'confuse'; chance?: number }
   | { kind: 'damage'; power?: number; category?: Exclude<MoveCategory, 'Status'> }
   | { kind: 'heal'; amount?: 'flat' | 'ratio'; ratio?: number; value?: number }
   | { kind: 'applyStatus'; status: Exclude<MajorStatus, null>; chance?: number }
@@ -60,7 +66,7 @@ export type EffectOperation =
   | { kind: 'sequence'; effects: EffectOperation[] };
 
 /** @deprecated Use MoveDefinition.effects. Kept only for save/content migration. */
-export type MoveEffect = EffectOperation['kind'] | 'burn' | 'poison' | 'paralyze' | 'sleep' | 'raise' | 'lower' | 'weather' | 'priority';
+export type MoveEffect = EffectOperation['kind'] | 'burn' | 'poison' | 'toxic' | 'paralyze' | 'sleep' | 'freeze' | 'confuse' | 'raise' | 'lower' | 'weather' | 'priority';
 
 export interface MoveDefinition {
   id: string;
@@ -70,7 +76,7 @@ export interface MoveDefinition {
   accuracy: number;
   pp: number;
   priority: number;
-  target: 'self' | 'foe';
+  target: 'self' | 'foe' | 'allFoes';
   category: MoveCategory;
   /** Declarative, composable move behavior. */
   effects?: EffectOperation[];
@@ -107,11 +113,15 @@ export interface CreatureInstance {
   currentHp: number;
   status: MajorStatus;
   sleepTurns: number;
+  toxicCounter: number;
+  confusionTurns?: number;
   friendship: number;
   moves: KnownMove[];
   heldItem: string | null;
   nickname: string | null;
   capture: CaptureMetadata;
+  personalityValue: number;
+  shiny: boolean;
 }
 
 export interface StatStages {
@@ -134,7 +144,8 @@ export interface BattleSide {
 }
 
 export type BattleAction =
-  | { kind: 'move'; moveIndex: number }
+  | { kind: 'move'; moveIndex: number; target?: number }
+  | { kind: 'struggle' }
   | { kind: 'switch'; partyIndex: number }
   | { kind: 'item'; itemId: string; targetIndex?: number }
   | { kind: 'capture'; itemId: string }
@@ -148,6 +159,123 @@ export interface BattleContext {
   turn: number;
   ended: boolean;
   winner: 'player' | 'enemy' | 'fled' | 'captured' | null;
+  format?: 'single' | 'double' | 'multi';
+}
+
+export interface DoubleBattleSide extends BattleSide {
+  activeSlots: [number, number];
+  protectedSlots?: [boolean, boolean];
+}
+
+export interface CloudProfileV2 {
+  schemaVersion: 2;
+  accountId: string;
+  displayName: string;
+  guest: boolean;
+  player: GameSaveV1['player'];
+  location: GameSaveV1['location'];
+  party: CreatureInstance[];
+  storage: CreatureInstance[];
+  inventory: InventoryStack[];
+  money: number;
+  guide: GameSaveV1['guide'];
+  storyFlags: string[];
+  defeatedTrainers: string[];
+  collectedItems: string[];
+  options: GameSaveV1['options'];
+  playTimeSeconds: number;
+  startedAt: number;
+  pendingEvolution: GameSaveV1['pendingEvolution'];
+  crests: string[];
+  worldId: string;
+  updatedAt: number;
+}
+
+export interface WorldDirectoryEntry {
+  id: string;
+  name: string;
+  players: number;
+  capacity: number;
+  pingMs: number | null;
+  healthy: boolean;
+}
+
+export interface PresenceRecord {
+  accountId: string;
+  displayName: string;
+  worldId: string;
+  x: number;
+  y: number;
+  mapId: string;
+  onlineAt: number;
+}
+
+export interface PlayerCard {
+  accountId: string;
+  displayName: string;
+  avatar: 'a' | 'b';
+  crests: string[];
+  playTimeSeconds: number;
+  caughtCount: number;
+  joinedAt: number;
+}
+
+export interface FriendRecord {
+  accountId: string;
+  displayName: string;
+  status: 'pending' | 'accepted' | 'blocked';
+  online: boolean;
+  updatedAt: number;
+}
+
+export interface ChatMessage {
+  id: string;
+  channel: 'local' | 'world' | 'party' | 'direct';
+  from: string;
+  to?: string;
+  body: string;
+  createdAt: number;
+}
+
+export interface TradeListing {
+  id: string;
+  ownerId: string;
+  offeredCreatureUid?: string;
+  offeredSpeciesId: string;
+  offeredLevel: number;
+  requestedSpeciesId?: string;
+  requestedLevel?: number;
+  status: 'open' | 'locked' | 'completed' | 'cancelled' | 'expired';
+  createdAt: number;
+  expiresAt: number;
+}
+
+export interface TradeSession {
+  id: string;
+  leftId: string;
+  rightId: string;
+  leftCreatureUid?: string;
+  rightCreatureUid?: string;
+  leftConfirmed: boolean;
+  rightConfirmed: boolean;
+  status: 'open' | 'locked' | 'completed' | 'cancelled';
+}
+
+export interface BattleRoom {
+  id: string;
+  format: 'single' | 'double';
+  hostId: string;
+  guestId?: string;
+  turn: number;
+  status: 'open' | 'active' | 'complete' | 'cancelled';
+}
+
+export interface NetworkEnvelope<T = unknown> {
+  version: 1;
+  id: string;
+  type: string;
+  sentAt: number;
+  payload: T;
 }
 
 export interface BattleEvent {
@@ -214,6 +342,7 @@ export interface GameOptions {
   sound: 'mono' | 'stereo';
   buttonMode: 'normal' | 'lr' | 'lEqualsA';
   frame: number;
+  reducedMotion: boolean;
 }
 export interface GameSaveV1 {
   schemaVersion: 1;

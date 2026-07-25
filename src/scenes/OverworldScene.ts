@@ -2,14 +2,15 @@ import Phaser from 'phaser';
 import { audio } from '../audio';
 import { controls } from '../controls';
 import { createCreature, ITEMS, SPECIES } from '../data';
-import { configureGbaCamera } from '../display';
+import { configureGbaCamera, configureOverworldCharacter } from '../display';
 import { MAPS } from '../maps';
 import { gameStore } from '../state';
 import type { Direction, MapDefinition, NpcDefinition, TileKind, TrainerDefinition } from '../types';
 import { COLORS, label, panel, textStyle } from '../ui';
-import { DIRECTION_DELTAS, facingFrame, oppositeDirection, terrain3x3Frame, trainerHasLineOfSight } from '../world';
+import { DIRECTION_DELTAS, applyFacing, oppositeDirection, terrain3x3Frame, trainerHasLineOfSight, walkStepFrames } from '../world';
 
 const TILE = 16;
+const MOVEMENT_TIME_SCALE = 1.9;
 const BLOCKED = new Set<TileKind>(['tree','wall','water','rock','counter']);
 const GRASS_FRAMES = [264,264,264,265,266];
 const DEEP_GRASS_FRAMES = [275,275,275,276,277];
@@ -21,6 +22,10 @@ export class OverworldScene extends Phaser.Scene {
   private player!: Phaser.GameObjects.Sprite;
   private position = { x: 0, y: 0 };
   private moving = false;
+  private bumping = false;
+  private repeatAt = 0;
+  private repeatDirection: Direction | null = null;
+  private walkPhase: 0 | 1 = 0;
   private modal = false;
   private lastStep = 0;
   private dialogueLines: string[] = [];
@@ -32,17 +37,17 @@ export class OverworldScene extends Phaser.Scene {
   constructor() { super('Overworld'); }
   create() {
     configureGbaCamera(this);
-    this.moving=false;this.modal=false;this.dialogueLines=[];this.dialogueDone=undefined;this.dialogueObjects=[];this.actors=new Map();this.titleObjects=[];this.cameraFx=[];
+    this.moving=false;this.bumping=false;this.repeatAt=0;this.repeatDirection=null;this.walkPhase=0;this.modal=false;this.dialogueLines=[];this.dialogueDone=undefined;this.dialogueObjects=[];this.actors=new Map();this.titleObjects=[];this.cameraFx=[];
     const save = gameStore.save;
     if (!save) { this.scene.start('Title'); return; }
     this.map = MAPS[save.location.mapId] ?? MAPS.mossmere;
     this.position = { x: save.location.x, y: save.location.y };
     document.body.dataset.gameScene='overworld';document.body.dataset.map=this.map.id;document.body.dataset.position=`${this.position.x},${this.position.y}`;
     this.renderMap();
-    this.player = this.add.sprite(this.position.x*TILE+8,this.position.y*TILE+16,`avatar-${save.player.avatar}`,facingFrame(save.location.facing)).setOrigin(.5,1).setDepth(this.worldDepth(this.position.y*TILE+16));
+    this.player = applyFacing(configureOverworldCharacter(this.add.sprite(this.position.x*TILE+8,this.position.y*TILE+16,`avatar-${save.player.avatar}`,0)),save.location.facing).setDepth(this.worldDepth(this.position.y*TILE+16));
     this.player.setData('facing',save.location.facing);
     this.cameras.main.setBounds(0,0,this.map.width*TILE,this.map.height*TILE).setRoundPixels(true);
-    this.cameras.main.startFollow(this.player,true,.18,.18);
+    this.cameras.main.startFollow(this.player,true,1,1);
     this.cameras.main.fadeIn(180,0,0,0);
     this.showMapTitle();
     audio.playMusic(this,this.map.music);
@@ -55,12 +60,19 @@ export class OverworldScene extends Phaser.Scene {
     if (!gameStore.save) return;
     this.updateCameraFx();
     if (this.modal) { if (controls.pressed('A')||controls.pressed('B')) this.advanceDialogue(); return; }
-    if (this.moving) return;
+    if (this.moving || this.bumping || time < this.repeatAt) return;
     if (controls.pressed('MENU')) { audio.sfx('confirm'); this.scene.launch('Menu',{mode:'pause'}); this.scene.pause(); return; }
     if (controls.pressed('A')) { this.interact(); return; }
-    if (time-this.lastStep<35) return;
-    const direction: Direction | null = (controls.pressed('UP')||controls.isDown('UP'))?'up':(controls.pressed('DOWN')||controls.isDown('DOWN'))?'down':(controls.pressed('LEFT')||controls.isDown('LEFT'))?'left':(controls.pressed('RIGHT')||controls.isDown('RIGHT'))?'right':null;
+    if (time-this.lastStep<20) return;
+    const buffered = this.repeatDirection ?? controls.consumeDirection();
+    this.repeatDirection=null;
+    const direction: Direction | null = buffered ?? ((controls.pressed('UP')||controls.isDown('UP'))?'up':(controls.pressed('DOWN')||controls.isDown('DOWN'))?'down':(controls.pressed('LEFT')||controls.isDown('LEFT'))?'left':(controls.pressed('RIGHT')||controls.isDown('RIGHT'))?'right':null);
     if (direction) this.tryMove(direction,time);
+    else if (this.player.anims.isPlaying) {
+      const facing=(this.player.getData('facing')||'down') as Direction;
+      this.player.stop();
+      applyFacing(this.player,facing);
+    }
   }
   private renderMap() {
     const color = this.map.kind==='interior' ? 0x6b5a44 : this.map.palette==='ash'||this.map.palette==='ember' ? 0x4b4136 : 0x274d34;
@@ -87,7 +99,7 @@ export class OverworldScene extends Phaser.Scene {
     if(this.map.kind!=='interior')this.renderWorldDetails();
     const people: Array<NpcDefinition|TrainerDefinition> = [...this.map.npcs,...this.map.trainers.filter((t)=>this.trainerActive(t))];
     people.forEach((person)=>{
-      const sprite=this.add.sprite(person.x*TILE+8,person.y*TILE+16,`npc-${person.sprite}`,facingFrame(person.facing)).setOrigin(.5,1).setDepth(this.worldDepth(person.y*TILE+16));
+      const sprite=applyFacing(configureOverworldCharacter(this.add.sprite(person.x*TILE+8,person.y*TILE+16,`npc-${person.sprite}`,0)),person.facing).setDepth(this.worldDepth(person.y*TILE+16));
       sprite.setData('id',person.id);this.actors.set(person.id,sprite);
       if ('party' in person && this.trainerActive(person)) this.add.image(person.x*TILE+8,person.y*TILE-7,'pixel-white').setDisplaySize(3,3).setTint(person.boss?0xffd34e:0xe8efc7).setDepth(11);
     });
@@ -201,12 +213,25 @@ export class OverworldScene extends Phaser.Scene {
     if (!this.passable(tx,ty)) { this.bump(direction);this.lastStep=time;return; }
     if (this.map.storyGate && !gameStore.flag(this.map.storyGate.flag) && tx===this.map.storyGate.x&&ty===this.map.storyGate.y) { this.showDialogue([this.map.storyGate.message]);return; }
     this.moving=true;this.lastStep=time;this.position={x:tx,y:ty};gameStore.setLocation(this.map.id,tx,ty);
-    this.player.setDepth(this.worldDepth(ty*TILE+16));
+    // Depth follows the feet during the step; assigning the destination depth
+    // before the tween makes foreground tiles draw over the character mid-step.
+    this.player.setDepth(this.worldDepth(this.player.y));
     document.body.dataset.position=`${tx},${ty}`;
-    const running=controls.isDown('RUN')||controls.isDown('B');const duration=target==='ledge'?170:running?68:112;
-    this.player.play(`${save.player.avatar}-${direction}`,true);audio.sfx(target==='tallGrass'?'grass':'step');
-    this.tweens.add({targets:this.player,x:tx*TILE+8,y:ty*TILE+16,duration,ease:'Linear',onComplete:()=>{
-      this.player.stop();this.player.setFrame(facingFrame(direction));this.moving=false;
+    const running=controls.isDown('RUN')||controls.isDown('B');const baseDuration=target==='ledge'?180:running?90:140;const duration=Math.round(baseDuration*MOVEMENT_TIME_SCALE);
+    const [firstFrame, secondFrame]=walkStepFrames(direction,this.walkPhase);
+    this.walkPhase=this.walkPhase===0?1:0;
+    this.player.anims.stop();
+    this.player.setFrame(firstFrame);
+    this.time.delayedCall(duration/2,()=>{if(this.moving)this.player.setFrame(secondFrame);});
+    audio.sfx(target==='tallGrass'?'grass':'step');
+    this.tweens.add({targets:this.player,x:tx*TILE+8,y:ty*TILE+16,duration,ease:'Linear',onUpdate:()=>this.player.setDepth(this.worldDepth(this.player.y)),onComplete:()=>{
+      this.moving=false;
+      this.player.anims.stop();
+      this.player.setFrame(secondFrame);
+      const bufferedDirection=controls.consumeDirection();
+      const held=controls.isDirectionDown(direction);
+      if (!bufferedDirection && !held) { this.player.stop();applyFacing(this.player,direction); this.repeatAt=0; }
+      else { this.repeatDirection=bufferedDirection; this.repeatAt=0; }
       this.afterStep(target);
     }});
   }
@@ -217,7 +242,7 @@ export class OverworldScene extends Phaser.Scene {
     if([...this.map.npcs,...this.map.trainers.filter((t)=>this.trainerActive(t))].some((person)=>person.x===x&&person.y===y))return false;
     return true;
   }
-  private bump(direction:Direction){const[dx,dy]=DIRECTION_DELTAS[direction];this.player.setFrame(facingFrame(direction));this.tweens.add({targets:this.player,x:this.player.x+dx*2,y:this.player.y+dy*2,duration:45,yoyo:true});}
+  private bump(direction:Direction){const[dx,dy]=DIRECTION_DELTAS[direction];this.bumping=true;this.repeatAt=this.time.now+180;applyFacing(this.player,direction);this.tweens.add({targets:this.player,x:this.player.x+dx*2,y:this.player.y+dy*2,duration:45,yoyo:true,onComplete:()=>{this.bumping=false;}});}
   private afterStep(tile?:TileKind) {
     const warp=this.map.warps.find((entry)=>entry.x===this.position.x&&entry.y===this.position.y);
     if(warp){audio.sfx(warp.id.includes('exit')?'door':'door');this.transitionMap(warp.toMap,warp.toX,warp.toY);return;}
@@ -234,7 +259,8 @@ export class OverworldScene extends Phaser.Scene {
     const front=this.frontPosition();
     const person=[...this.map.npcs,...this.map.trainers.filter((t)=>this.trainerActive(t))].find((entry)=>entry.x===front.x&&entry.y===front.y);
     if(person){
-      this.actors.get(person.id)?.setFrame(facingFrame(oppositeDirection(this.player.getData('facing') as Direction)));
+      const actor=this.actors.get(person.id);
+      if (actor) applyFacing(actor, oppositeDirection(this.player.getData('facing') as Direction));
       if('party' in person){this.startTrainer(person as TrainerDefinition);return;}
       if(person.id.includes('healer')){this.showDialogue([`${person.name}: ${person.dialogue[0]}`,'Your party was restored to full health.'],()=>{gameStore.healAll();audio.sfx('heal');});return;}
       if(person.id.includes('clerk')){this.showDialogue([`${person.name}: ${person.dialogue[0]}`],()=>{this.scene.launch('Menu',{mode:'shop'});this.scene.pause();});return;}
@@ -258,7 +284,8 @@ export class OverworldScene extends Phaser.Scene {
   private trainerActive(trainer:TrainerDefinition){return !gameStore.hasDefeated(trainer.flag)||(Boolean(trainer.boss)&&gameStore.flag('champion'));}
   private startTrainer(trainer:TrainerDefinition){
     if(this.modal||this.moving)return;const actor=this.actors.get(trainer.id);if(actor){const mark=this.add.text(actor.x,actor.y-34,'!',textStyle(15,'#f2d25f')).setOrigin(.5).setDepth(60).setStroke('#301f18',2);this.tweens.add({targets:mark,y:mark.y-5,duration:180,yoyo:true});}
-    this.showDialogue(trainer.dialogue.map((line,index)=>index===0?`${trainer.name}: ${line}`:line),()=>this.encounterTransition(()=>this.scene.start('Battle',{kind:'trainer',trainer,mapId:this.map.id})));
+    const canDouble = trainer.party.length >= 2 && (gameStore.save?.party.filter((creature) => creature.currentHp > 0).length ?? 0) >= 2;
+    this.showDialogue(trainer.dialogue.map((line,index)=>index===0?`${trainer.name}: ${line}`:line),()=>this.encounterTransition(()=>this.scene.start(canDouble ? 'DoubleBattle' : 'Battle', { kind:'trainer', trainer, mapId:this.map.id })));
   }
   private startWild(){
     const entries=this.map.encounters!;const total=entries.reduce((sum,e)=>sum+e.weight,0);let roll=Math.random()*total;let chosen=entries[0];for(const entry of entries){roll-=entry.weight;if(roll<=0){chosen=entry;break;}}

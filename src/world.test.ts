@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { TrainerDefinition } from './types';
-import { facingFrame, terrain3x3Frame, trainerHasLineOfSight } from './world';
+import { facingFlipX, facingFrame, terrain3x3Frame, trainerHasLineOfSight, walkFrames, walkStepFrames } from './world';
 
 const trainer = (facing: TrainerDefinition['facing']): TrainerDefinition => ({
   id: 't', x: 5, y: 5, name: 'Scout', dialogue: [], sprite: 'rival', facing,
@@ -8,8 +8,21 @@ const trainer = (facing: TrainerDefinition['facing']): TrainerDefinition => ({
 });
 
 describe('overworld facing', () => {
-  it('maps the sprite-sheet columns to visible directions', () => {
-    expect([facingFrame('down'), facingFrame('up'), facingFrame('left'), facingFrame('right')]).toEqual([0, 1, 2, 3]);
+  it('maps each direction to the first frame of its sheet row', () => {
+    expect([facingFrame('down'), facingFrame('up'), facingFrame('left'), facingFrame('right')]).toEqual([0, 4, 8, 12]);
+  });
+
+  it('does not flip sheets that already include left and right rows', () => {
+    expect(facingFlipX('left')).toBe(false);
+    expect(facingFlipX('right')).toBe(false);
+  });
+
+  it('builds four-frame walk cycles from each direction row', () => {
+    expect(walkFrames('up')).toEqual([4, 5, 6, 7]);
+    expect(walkFrames('left')).toEqual([8, 9, 10, 11]);
+  expect(walkFrames('right')).toEqual([12, 13, 14, 15]);
+  expect(walkStepFrames('down', 0)).toEqual([0, 1]);
+  expect(walkStepFrames('down', 1)).toEqual([2, 3]);
   });
 
   it('only detects the player in the direction the trainer visibly faces', () => {

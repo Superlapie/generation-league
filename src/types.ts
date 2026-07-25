@@ -207,6 +207,7 @@ export interface PresenceRecord {
   x: number;
   y: number;
   mapId: string;
+  avatar: 'a' | 'b';
   onlineAt: number;
 }
 

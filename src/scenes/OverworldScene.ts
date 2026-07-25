@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { audio } from '../audio';
 import { controls } from '../controls';
 import { createCreature, ITEMS, SPECIES } from '../data';
-import { configureGbaCamera, configureOverworldCharacter } from '../display';
+import { configureGbaCamera, configureOverworldCharacter, createOverworldNameplate, OVERWORLD_NAMEPLATE_OFFSET, overworldAvatarKey, type OverworldNameplate } from '../display';
 import { MAPS } from '../maps';
 import { gameStore } from '../state';
 import type { ChatMessage, Direction, MapDefinition, NpcDefinition, PresenceRecord, TileKind, TrainerDefinition } from '../types';
@@ -34,7 +34,7 @@ export class OverworldScene extends Phaser.Scene {
   private dialogueDone?: () => void;
   private dialogueObjects: Phaser.GameObjects.GameObject[] = [];
   private actors = new Map<string, Phaser.GameObjects.Sprite>();
-  private remoteActors = new Map<string, { sprite: Phaser.GameObjects.Sprite; name: Phaser.GameObjects.Text }>();
+  private remoteActors = new Map<string, { sprite: Phaser.GameObjects.Sprite; nameplate: OverworldNameplate }>();
   private onlinePlayers = new Map<string, PresenceRecord>();
   private chatMessages: ChatMessage[] = [];
   private chatOverlay: HTMLElement | null = null;
@@ -134,21 +134,36 @@ export class OverworldScene extends Phaser.Scene {
     visible.forEach((accountId) => {
       const player = this.onlinePlayers.get(accountId);
       if (!player) return;
+      const avatarKey = overworldAvatarKey(player.avatar);
       let actor = this.remoteActors.get(accountId);
       if (!actor) {
-        const sprite = applyFacing(configureOverworldCharacter(this.add.sprite(player.x * TILE + 8, player.y * TILE + 16, 'avatar-a', 0)), 'down').setDepth(this.worldDepth(player.y * TILE + 16) + 1);
-        const name = this.add.text(sprite.x, sprite.y - 25, player.displayName.slice(0, 16), { fontFamily: 'Arial', fontSize: '6px', color: '#f1f1d0', stroke: '#182017', strokeThickness: 3 }).setOrigin(.5, 1).setDepth(70);
-        actor = { sprite, name }; this.remoteActors.set(accountId, actor);
+        const footY = player.y * TILE + 16;
+        const sprite = applyFacing(configureOverworldCharacter(this.add.sprite(player.x * TILE + 8, footY, avatarKey, 0)), 'down').setDepth(this.worldDepth(footY) + 1);
+        sprite.setData('avatar', player.avatar);
+        const nameplate = createOverworldNameplate(this, player.displayName);
+        nameplate.setWorldPosition(sprite.x, footY);
+        nameplate.setDepth(this.worldDepth(footY) + 2);
+        actor = { sprite, nameplate };
+        this.remoteActors.set(accountId, actor);
       }
       const x = player.x * TILE + 8, y = player.y * TILE + 16;
-      this.tweens.add({ targets: [actor.sprite, actor.name], x, y, duration: 180, ease: 'Linear' });
-      actor.name.setText(player.displayName.slice(0, 16));
+      if (actor.sprite.getData('avatar') !== player.avatar) {
+        const facing = (actor.sprite.getData('facing') as Direction) || 'down';
+        actor.sprite.setTexture(avatarKey, 0);
+        configureOverworldCharacter(actor.sprite);
+        applyFacing(actor.sprite, facing);
+        actor.sprite.setData('avatar', player.avatar);
+      }
+      this.tweens.add({ targets: actor.sprite, x, y, duration: 180, ease: 'Linear' });
+      this.tweens.add({ targets: actor.nameplate.root, x, y: y - OVERWORLD_NAMEPLATE_OFFSET, duration: 180, ease: 'Linear' });
+      actor.nameplate.setDisplayName(player.displayName);
       actor.sprite.setDepth(this.worldDepth(y) + 1);
+      actor.nameplate.setDepth(this.worldDepth(y) + 2);
     });
     for (const [accountId, actor] of this.remoteActors) {
       if (!visible.has(accountId)) {
         actor.sprite.destroy();
-        actor.name.destroy();
+        actor.nameplate.destroy();
         this.remoteActors.delete(accountId);
       }
     }
@@ -357,7 +372,7 @@ export class OverworldScene extends Phaser.Scene {
     disconnectLiveWorld();
     this.chatOverlay?.remove();
     this.chatOverlay = null;
-    this.remoteActors.forEach(({ sprite, name }) => { sprite.destroy(); name.destroy(); });
+    this.remoteActors.forEach(({ sprite, nameplate }) => { sprite.destroy(); nameplate.destroy(); });
     this.remoteActors.clear();
   }
   private passable(x:number,y:number) {

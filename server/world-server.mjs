@@ -40,7 +40,7 @@ http.on('upgrade', (request, socket, head) => {
 sockets.on('connection', (socket) => {
   socket.isAlive = true;
   socket.on('pong', () => { socket.isAlive = true; });
-  const session = { accountId: `guest-${randomUUID()}`, displayName: 'Guest', guest: true, token: null, worldId: null, mapId: 'mossmere', x: 7, y: 6, socket, seenIds: new Set(), visibleIds: new Set() };
+  const session = { accountId: `guest-${randomUUID()}`, displayName: 'Guest', guest: true, token: null, worldId: null, mapId: 'mossmere', x: 7, y: 6, avatar: 'a', socket, seenIds: new Set(), visibleIds: new Set() };
   send(socket, 'worlds:list', { worlds: directory() });
   socket.on('message', (raw) => void handleMessage(session, raw));
   socket.on('close', () => leaveWorld(session));
@@ -129,7 +129,7 @@ function refreshPresenceView(session) {
     if (nextIds.has(accountId)) return;
     const player = [...(worlds.get(session.worldId)?.clients.values() ?? [])].find((client) => client.accountId === accountId);
     send(session.socket, 'presence:changed', {
-      player: player ? presence(player) : { accountId, displayName: '', worldId: session.worldId, x: 0, y: 0, mapId: '', onlineAt: Date.now() },
+      player: player ? presence(player) : { accountId, displayName: '', worldId: session.worldId, x: 0, y: 0, mapId: '', avatar: 'a', onlineAt: Date.now() },
       online: false,
     });
   });
@@ -174,6 +174,9 @@ async function handleMessage(session, raw) {
     session.y = clamp(payload.y, -999, 999);
     session.displayName = profiles.get(session.accountId)?.displayName || cleanText(payload.displayName) || 'Guest';
     const profile = profiles.get(session.accountId) ?? defaultProfile(session);
+    session.avatar = resolveAvatar(profile, payload);
+    profile.avatar = session.avatar;
+    if (profile.player && typeof profile.player === 'object') profile.player.avatar = session.avatar;
     const profileChanged = profile.worldId !== worldId || profile.guest !== session.guest;
     profile.worldId = worldId;
     if (profileChanged) profile.updatedAt = Date.now();
@@ -200,6 +203,9 @@ async function handleMessage(session, raw) {
     if (session.guest) return fail(session, 'account_required', 'Create an account before saving a cloud profile.');
     if (!payload.profile || JSON.stringify(payload.profile).length > 2_000_000) return fail(session, 'profile_invalid', 'That cloud profile is too large or invalid.');
     const profile = { ...payload.profile, accountId: session.accountId, guest: false, updatedAt: Date.now() };
+    session.avatar = resolveAvatar(profile, payload.profile);
+    profile.avatar = session.avatar;
+    if (profile.player && typeof profile.player === 'object') profile.player.avatar = session.avatar;
     profiles.set(session.accountId, profile);
     persistState();
     return send(session.socket, 'profile:ack', { profile });
@@ -246,6 +252,12 @@ async function handleMessage(session, raw) {
 }
 
 function clamp(value, min, max) { const number = Number(value); return Number.isFinite(number) ? Math.max(min, Math.min(max, Math.floor(number))) : 0; }
+function resolveAvatar(profile, payload = {}) {
+  if (payload?.avatar === 'b') return 'b';
+  if (profile?.player?.avatar === 'b') return 'b';
+  if (profile?.avatar === 'b') return 'b';
+  return 'a';
+}
 function defaultProfile(session) {
   return { accountId: session.accountId, displayName: session.displayName, guest: session.guest, avatar: 'a', crests: [], party: [], storage: [], inventory: [], money: 0, guide: { seen: [], caught: [] }, storyFlags: [], worldId: session.worldId, joinedAt: Date.now(), updatedAt: Date.now() };
 }
@@ -313,7 +325,7 @@ function loginAccount(session, payload) {
   attachAccount(session, account.accountId, token, false);
   send(session.socket, 'auth:ack', { accountId: account.accountId, token, guest: false, displayName: profiles.get(account.accountId)?.displayName ?? account.username });
 }
-function presence(session) { return { accountId: session.accountId, displayName: session.displayName, worldId: session.worldId, x: session.x, y: session.y, mapId: session.mapId, onlineAt: Date.now() }; }
+function presence(session) { return { accountId: session.accountId, displayName: session.displayName, worldId: session.worldId, x: session.x, y: session.y, mapId: session.mapId, avatar: session.avatar === 'b' ? 'b' : 'a', onlineAt: Date.now() }; }
 function leaveWorld(session) {
   if (!session.worldId) return;
   const world = worlds.get(session.worldId);

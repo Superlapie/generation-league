@@ -12,7 +12,7 @@ export function worldSocketUrl() {
 
 export type ClientMessage =
   | { type: 'ping'; payload: Record<string, never> }
-  | { type: 'hello'; payload: { displayName: string; guest: boolean; worldId: string; token?: string; mapId?: string; x?: number; y?: number } }
+  | { type: 'hello'; payload: { displayName: string; guest: boolean; worldId: string; token?: string; mapId?: string; x?: number; y?: number; avatar?: 'a' | 'b' } }
   | { type: 'auth:register'; payload: { username: string; password: string } }
   | { type: 'auth:login'; payload: { username: string; password: string } }
   | { type: 'profile:get'; payload: Record<string, never> }

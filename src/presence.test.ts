@@ -9,6 +9,7 @@ const player = (overrides: Partial<PresenceRecord> = {}): PresenceRecord => ({
   x: 10,
   y: 10,
   mapId: 'mossmere',
+  avatar: 'a',
   onlineAt: Date.now(),
   ...overrides,
 });

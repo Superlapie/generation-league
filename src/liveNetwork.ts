@@ -52,6 +52,7 @@ export function buildHelloPayload(mapId: string, x: number, y: number, worldId =
     mapId,
     x,
     y,
+    avatar: gameStore.save?.player.avatar ?? 'a',
   };
 }
 
@@ -59,7 +60,8 @@ function sessionMatches(current: HelloPayload, next: HelloPayload) {
   return current.worldId === next.worldId
     && current.token === next.token
     && current.guest === next.guest
-    && current.displayName === next.displayName;
+    && current.displayName === next.displayName
+    && current.avatar === next.avatar;
 }
 
 export function connectLiveWorldSession(

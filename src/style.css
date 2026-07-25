@@ -52,6 +52,19 @@ button:focus-visible { outline: 2px solid #e2c15d; outline-offset: 3px; }
 .auth-actions span { margin-left: 6px; font-size: 16px; }
 .auth-status { min-height: 18px; margin: 0; color: #d8d968; font-size: 11px; font-weight: 800; letter-spacing: .05em; }
 .auth-note { margin: -4px 0 0; color: #718477; font-size: 11px; line-height: 1.4; }
+.world-chat { position: fixed; z-index: 100; left: max(14px, env(safe-area-inset-left)); bottom: max(14px, env(safe-area-inset-bottom)); width: min(310px, calc(100vw - 28px)); border: 1px solid #60786b; color: #eaf0dc; background: #101914e8; box-shadow: 8px 8px 0 #08100bcc; backdrop-filter: blur(12px); font-family: "Segoe UI", Arial, sans-serif; }
+.world-chat.is-collapsed .world-chat-feed, .world-chat.is-collapsed form { display: none; }
+.world-chat-head { display: flex; justify-content: space-between; align-items: center; min-height: 32px; padding: 0 10px; border-bottom: 1px solid #30483b; color: #d8d968; font-size: 10px; font-weight: 900; letter-spacing: .12em; }
+.world-chat-head button { width: 24px; height: 24px; border: 1px solid #668276; color: #d8d968; background: transparent; font-size: 16px; line-height: 1; cursor: pointer; }
+.world-chat-head button:hover, .world-chat-head button:focus-visible { color: #13221b; background: #d8d968; }
+.world-chat-feed { display: grid; gap: 3px; max-height: 112px; overflow: auto; padding: 9px 10px 5px; scrollbar-color: #60786b transparent; }
+.world-chat-feed p { margin: 0; overflow-wrap: anywhere; color: #b5c3ad; font-size: 11px; line-height: 1.3; }
+.world-chat-feed b { color: #d8d968; font-weight: 800; }
+.world-chat form { display: flex; gap: 6px; padding: 7px; border-top: 1px solid #30483b; }
+.world-chat input { min-width: 0; flex: 1; height: 32px; border: 1px solid #60786b; padding: 0 8px; color: #eef3df; background: #18261f; font: 12px "Segoe UI", Arial, sans-serif; }
+.world-chat input:focus { outline: 2px solid #d8d968; outline-offset: 1px; }
+.world-chat form button { height: 32px; border: 1px solid #d8d968; padding: 0 10px; color: #13221b; background: #d8d968; font-size: 10px; font-weight: 900; cursor: pointer; }
+.world-chat form button:hover, .world-chat form button:focus-visible { filter: brightness(1.12); }
 #game-frame .chat-form { width: 212px; display: flex; gap: 4px; }
 #game-frame .chat-form input {
   flex: 1;
@@ -151,6 +164,10 @@ footer strong { color: #c9d6b6; }
 @media (max-width: 420px) {
   .auth-actions { grid-template-columns: 1fr; }
   .auth-brand h1 { font-size: 20px; }
+}
+
+@media (max-width: 700px) {
+  .world-chat { left: 8px; bottom: 8px; width: min(300px, calc(100vw - 16px)); }
 }
 
 @media (pointer: coarse) {

@@ -5,7 +5,8 @@ import { createCreature, ITEMS, SPECIES } from '../data';
 import { configureGbaCamera, configureOverworldCharacter } from '../display';
 import { MAPS } from '../maps';
 import { gameStore } from '../state';
-import type { Direction, MapDefinition, NpcDefinition, TileKind, TrainerDefinition } from '../types';
+import type { ChatMessage, Direction, MapDefinition, NpcDefinition, PresenceRecord, TileKind, TrainerDefinition } from '../types';
+import { GenerationNetworkClient, worldSocketUrl } from '../network';
 import { COLORS, label, panel, textStyle } from '../ui';
 import { DIRECTION_DELTAS, applyFacing, oppositeDirection, terrain3x3Frame, trainerHasLineOfSight, walkStepFrames } from '../world';
 
@@ -32,12 +33,19 @@ export class OverworldScene extends Phaser.Scene {
   private dialogueDone?: () => void;
   private dialogueObjects: Phaser.GameObjects.GameObject[] = [];
   private actors = new Map<string, Phaser.GameObjects.Sprite>();
+  private remoteActors = new Map<string, { sprite: Phaser.GameObjects.Sprite; name: Phaser.GameObjects.Text }>();
+  private network = new GenerationNetworkClient();
+  private onlinePlayers = new Map<string, PresenceRecord>();
+  private chatMessages: ChatMessage[] = [];
+  private chatOverlay: HTMLElement | null = null;
+  private networkToken = '';
+  private networkOff?: () => void;
   private titleObjects: Phaser.GameObjects.GameObject[] = [];
   private cameraFx: Array<Phaser.GameObjects.Rectangle|Phaser.GameObjects.Arc|Phaser.GameObjects.TileSprite> = [];
   constructor() { super('Overworld'); }
   create() {
     configureGbaCamera(this);
-    this.moving=false;this.bumping=false;this.repeatAt=0;this.repeatDirection=null;this.walkPhase=0;this.modal=false;this.dialogueLines=[];this.dialogueDone=undefined;this.dialogueObjects=[];this.actors=new Map();this.titleObjects=[];this.cameraFx=[];
+    this.moving=false;this.bumping=false;this.repeatAt=0;this.repeatDirection=null;this.walkPhase=0;this.modal=false;this.dialogueLines=[];this.dialogueDone=undefined;this.dialogueObjects=[];this.actors=new Map();this.remoteActors=new Map();this.onlinePlayers=new Map();this.chatMessages=[];this.titleObjects=[];this.cameraFx=[];
     const save = gameStore.save;
     if (!save) { this.scene.start('Title'); return; }
     this.map = MAPS[save.location.mapId] ?? MAPS.mossmere;
@@ -51,6 +59,8 @@ export class OverworldScene extends Phaser.Scene {
     this.cameras.main.fadeIn(180,0,0,0);
     this.showMapTitle();
     audio.playMusic(this,this.map.music);
+    this.connectLiveWorld();
+    this.createChatOverlay();
     controls.clear();
     if (this.map.id==='research-lodge' && gameStore.flag('tutorialReady') && !gameStore.flag('tutorialDone')) {
       this.time.delayedCall(450,()=>this.showDialogue(['PROFESSOR ASTER: A good partnership begins by listening.','Walk with the D-pad or arrow keys. Face someone and press A to talk.','Open MENU to see your Party, Bag, Guide, Player Card, Save, and Options.','Your first goal is Warden Lyra in Glimmerwood. The road begins north of Mossmere.'],()=>gameStore.addFlag('tutorialDone')));
@@ -58,6 +68,8 @@ export class OverworldScene extends Phaser.Scene {
   }
   update(time: number) {
     if (!gameStore.save) return;
+    const storedToken = this.readAuth().token ?? '';
+    if (storedToken !== this.networkToken) this.connectLiveWorld();
     this.updateCameraFx();
     if (this.modal) { if (controls.pressed('A')||controls.pressed('B')) this.advanceDialogue(); return; }
     if (this.moving || this.bumping || time < this.repeatAt) return;
@@ -73,6 +85,57 @@ export class OverworldScene extends Phaser.Scene {
       this.player.stop();
       applyFacing(this.player,facing);
     }
+  }
+  private readAuth() { try { return JSON.parse(localStorage.getItem('generation-league:auth:v1') ?? '{}') as { token?: string; accountId?: string; displayName?: string }; } catch { return {}; } }
+  private connectLiveWorld() {
+    const auth = this.readAuth();
+    this.networkToken = auth.token ?? '';
+    this.networkOff?.();
+    const worldId = localStorage.getItem('generation-league:world:v1') || 'mossmere';
+    this.network.connect(worldSocketUrl(), { displayName: gameStore.save?.player.name ?? auth.displayName ?? 'Guest', guest: !this.networkToken, worldId, token: this.networkToken || undefined });
+    this.networkOff = this.network.onMessage((message) => {
+      if (message.type === 'presence:list') { this.onlinePlayers.clear(); message.payload.players.forEach((player) => this.onlinePlayers.set(player.accountId, player)); this.syncRemotePlayers(); }
+      if (message.type === 'presence:changed') { if (message.payload.online) this.onlinePlayers.set(message.payload.player.accountId, message.payload.player); else this.onlinePlayers.delete(message.payload.player.accountId); this.syncRemotePlayers(); }
+      if (message.type === 'chat:message' && (message.payload.channel === 'world' || message.payload.channel === 'local')) { this.chatMessages = [...this.chatMessages, message.payload].slice(-20); this.refreshChatOverlay(); }
+    });
+    this.network.send('presence:update', { mapId: this.map.id, x: this.position.x, y: this.position.y });
+  }
+  private syncRemotePlayers() {
+    const ownId = this.readAuth().accountId;
+    this.onlinePlayers.forEach((player, accountId) => {
+      if (accountId === ownId || player.mapId !== this.map.id) {
+        const existing = this.remoteActors.get(accountId);
+        if (existing) { existing.sprite.destroy(); existing.name.destroy(); this.remoteActors.delete(accountId); }
+        return;
+      }
+      let actor = this.remoteActors.get(accountId);
+      if (!actor) {
+        const sprite = applyFacing(configureOverworldCharacter(this.add.sprite(player.x * TILE + 8, player.y * TILE + 16, 'avatar-a', 0)), 'down').setDepth(this.worldDepth(player.y * TILE + 16) + 1);
+        const name = this.add.text(sprite.x, sprite.y - 25, player.displayName.slice(0, 16), { fontFamily: 'Arial', fontSize: '6px', color: '#f1f1d0', stroke: '#182017', strokeThickness: 3 }).setOrigin(.5, 1).setDepth(70);
+        actor = { sprite, name }; this.remoteActors.set(accountId, actor);
+      }
+      const x = player.x * TILE + 8, y = player.y * TILE + 16;
+      this.tweens.add({ targets: [actor.sprite, actor.name], x, y, duration: 180, ease: 'Linear' });
+      actor.name.setText(player.displayName.slice(0, 16));
+      actor.sprite.setDepth(this.worldDepth(y) + 1);
+    });
+  }
+  private createChatOverlay() {
+    this.chatOverlay?.remove();
+    this.chatOverlay = document.createElement('aside');
+    this.chatOverlay.className = 'world-chat';
+    this.chatOverlay.innerHTML = '<div class="world-chat-head"><span>WORLD CHAT</span><button type="button" data-chat-toggle aria-label="Toggle world chat">−</button></div><div class="world-chat-feed" data-chat-feed></div><form data-world-chat-form><input name="body" maxlength="240" autocomplete="off" placeholder="Message the world..." aria-label="World chat message"><button type="submit" aria-label="Send message">SEND</button></form>';
+    document.body.append(this.chatOverlay);
+    this.chatOverlay.querySelector('[data-chat-toggle]')?.addEventListener('click', () => this.chatOverlay?.classList.toggle('is-collapsed'));
+    this.chatOverlay.querySelector('form')?.addEventListener('submit', (event) => { event.preventDefault(); const form = event.currentTarget as HTMLFormElement; const input = form.elements.namedItem('body') as HTMLInputElement; const body = input.value.trim(); if (!body) return; if (this.network.send('chat:send', { channel: 'world', body })) input.value = ''; });
+    this.refreshChatOverlay();
+  }
+  private refreshChatOverlay() {
+    const feed = this.chatOverlay?.querySelector('[data-chat-feed]'); if (!feed) return;
+    feed.replaceChildren();
+    const names = new Map([...this.onlinePlayers].map(([id, player]) => [id, player.displayName]));
+    this.chatMessages.slice(-5).forEach((message) => { const row = document.createElement('p'); const author = document.createElement('b'); const auth = this.readAuth(); author.textContent = names.get(message.from) ?? (message.from === auth.accountId ? (auth.displayName ?? 'You') : 'Player'); row.append(author, document.createTextNode(` ${message.body}`)); feed.append(row); });
+    feed.scrollTop = feed.scrollHeight;
   }
   private renderMap() {
     const color = this.map.kind==='interior' ? 0x6b5a44 : this.map.palette==='ash'||this.map.palette==='ember' ? 0x4b4136 : 0x274d34;
@@ -213,6 +276,7 @@ export class OverworldScene extends Phaser.Scene {
     if (!this.passable(tx,ty)) { this.bump(direction);this.lastStep=time;return; }
     if (this.map.storyGate && !gameStore.flag(this.map.storyGate.flag) && tx===this.map.storyGate.x&&ty===this.map.storyGate.y) { this.showDialogue([this.map.storyGate.message]);return; }
     this.moving=true;this.lastStep=time;this.position={x:tx,y:ty};gameStore.setLocation(this.map.id,tx,ty);
+    this.network.send('presence:update', { mapId: this.map.id, x: tx, y: ty });
     // Depth follows the feet during the step; assigning the destination depth
     // before the tween makes foreground tiles draw over the character mid-step.
     this.player.setDepth(this.worldDepth(this.player.y));
@@ -234,6 +298,15 @@ export class OverworldScene extends Phaser.Scene {
       else { this.repeatDirection=bufferedDirection; this.repeatAt=0; }
       this.afterStep(target);
     }});
+  }
+  shutdown() {
+    this.network.close();
+    this.networkOff?.();
+    this.networkOff = undefined;
+    this.chatOverlay?.remove();
+    this.chatOverlay = null;
+    this.remoteActors.forEach(({ sprite, name }) => { sprite.destroy(); name.destroy(); });
+    this.remoteActors.clear();
   }
   private passable(x:number,y:number) {
     const tile=this.map.tiles[y]?.[x];if(!tile||BLOCKED.has(tile))return false;

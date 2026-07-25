@@ -8,7 +8,8 @@ import { calculateStats, expForLevel } from '../rules';
 import { gameStore } from '../state';
 import type { CreatureInstance, GameOptions, ItemDefinition } from '../types';
 import { applyCloudProfile, toCloudProfile } from '../cloudProfile';
-import { connectLiveWorldSession, liveNetwork, switchWorldSession } from '../liveNetwork';
+import { configureAuthOverlay, hideAuthOverlay, setAuthOverlayStatus, showAuthOverlay } from '../authOverlay';
+import { canAttemptLiveConnection, connectLiveWorldSession, liveNetwork, switchWorldSession } from '../liveNetwork';
 import type { ChatMessage, FriendRecord, PlayerCard, PresenceRecord, TradeListing, WorldDirectoryEntry } from '../types';
 import { COLORS, hpColor, label, panel, textStyle } from '../ui';
 
@@ -75,19 +76,16 @@ export class MenuScene extends Phaser.Scene {
   private authToken = '';
   private authStatus = 'GUEST SESSION: LINK AN ACCOUNT TO SYNC PROGRESS';
   private connectedWorldId = 'mossmere';
-  private authOverlay: HTMLElement | null = null;
   private socialChatDom: Phaser.GameObjects.DOMElement | null = null;
   private socialChatSubmitting = false;
   private socialMessageObjects: Phaser.GameObjects.Text[] = [];
   private networkOff?: () => void;
-  private promptLogin = false;
 
   constructor() { super('Menu'); }
 
-  init(data: { mode?: MenuMode; page?: Page; promptLogin?: boolean }) {
+  init(data: { mode?: MenuMode; page?: Page }) {
     this.mode = data.mode ?? 'pause';
     this.page = data.page ?? (this.mode === 'shop' ? 'shop' : 'root');
-    this.promptLogin = data.promptLogin ?? false;
     this.cursor = 0;
     this.summaryPage = 0;
     this.pocket = 0;
@@ -123,7 +121,10 @@ export class MenuScene extends Phaser.Scene {
       if (message.type === 'player:card') { this.selectedCard = message.payload; this.note = `${message.payload.displayName.toUpperCase()} PLAYER CARD`; if (this.page === 'social') this.render(); }
       if (message.type === 'trade:changed' && message.payload.listing) { this.tradeListings = [...this.tradeListings.filter((listing) => listing.id !== message.payload.listing!.id), message.payload.listing]; if (this.page === 'social') this.render(); }
       if (message.type === 'error') {
-        if (this.page === 'account') this.authStatus = message.payload.message.toUpperCase();
+        if (this.page === 'account') {
+          this.authStatus = message.payload.message.toUpperCase();
+          setAuthOverlayStatus(this.authStatus);
+        }
         this.worldStatus = message.payload.message.toUpperCase();
         this.render();
       }
@@ -284,53 +285,23 @@ export class MenuScene extends Phaser.Scene {
   private renderAccount() {
     this.header('CLOUD ACCOUNT', this.accountId && !this.accountId.startsWith('guest-') ? 'LINKED' : 'GUEST');
     this.box(8, 27, 224, 118, 0xe4e9cf);
-    this.keep(label(this, 16, 42, this.promptLogin ? 'SIGN IN TO PROTECT YOUR SAVE' : 'ACCOUNT CONTROLS OPEN', 8, '#30433a', 3));
-    this.keep(label(this, 16, 61, this.promptLogin ? 'LINK AN ACCOUNT BEFORE YOU CONTINUE' : 'USE THE SECURE ACCOUNT WINDOW', 6, '#52665c', 3));
-    this.keep(label(this, 14, 148, this.note || (this.promptLogin ? 'B: CONTINUE AS GUEST' : 'B: BACK'), 6, '#c9d8bd', 3));
-    this.renderAuthOverlay();
+    this.keep(label(this, 16, 42, 'ACCOUNT CONTROLS OPEN', 8, '#30433a', 3));
+    this.keep(label(this, 16, 61, 'USE THE SECURE ACCOUNT WINDOW', 6, '#52665c', 3));
+    this.keep(label(this, 14, 148, this.note || 'B: BACK', 6, '#c9d8bd', 3));
+    this.syncAccountAuthOverlay();
   }
 
-  private renderAuthOverlay() {
-    if (!this.authOverlay) {
-      this.authOverlay = document.createElement('section');
-      this.authOverlay.className = 'auth-overlay';
-      this.authOverlay.setAttribute('aria-label', 'Cloud account');
-      this.authOverlay.innerHTML = `
-        <div class="auth-shell">
-          <div class="auth-brand"><span class="auth-mark">GL</span><div><p>GENERATION LEAGUE</p><h1>Protect your journey</h1></div></div>
-          <div class="auth-layout">
-            <div class="auth-intro"><span class="auth-kicker">CLOUD IDENTITY</span><h2>Continue your adventure across worlds.</h2><p>Link your save to keep your profile, party, and progress available wherever you play.</p><div class="auth-worlds"><span>01</span><span>02</span><span>03</span><b>SHARED WORLDS</b></div></div>
-            <form class="auth-card" data-auth-form>
-              <div class="auth-card-head"><div><span class="auth-kicker">ACCOUNT ACCESS</span><h2>Sign in or register</h2></div><button type="button" class="auth-close" data-auth-close aria-label="Return to game">×</button></div>
-              <label>DISPLAY NAME<input name="username" maxlength="16" pattern="[A-Za-z0-9_]{3,16}" autocomplete="username" placeholder="3-16 letters, numbers, or _" required></label>
-              <label>PASSWORD<input name="password" type="password" minlength="8" maxlength="128" autocomplete="current-password" placeholder="8-128 characters" required></label>
-              <div class="auth-actions"><button type="submit" data-auth="login">SIGN IN <span>↗</span></button><button type="submit" data-auth="register">CREATE ACCOUNT <span>+</span></button></div>
-              <p class="auth-status" data-auth-status aria-live="polite"></p>
-              <p class="auth-note">Your guest save remains on this device until you link it.</p>
-            </form>
-          </div>
-        </div>`;
-      document.body.append(this.authOverlay);
-      const form = this.authOverlay.querySelector('[data-auth-form]') as HTMLFormElement;
-      form.addEventListener('submit', (event) => {
-        event.preventDefault();
-        const submitter = (event as SubmitEvent).submitter as HTMLButtonElement | null;
-        const values = new FormData(form);
-        const username = String(values.get('username') ?? '').trim();
-        const password = String(values.get('password') ?? '');
-        if (!form.reportValidity()) return;
-        liveNetwork.send(submitter?.dataset.auth === 'register' ? 'auth:register' : 'auth:login', { username, password });
+  private syncAccountAuthOverlay() {
+    configureAuthOverlay({
+      onSubmit: (mode, username, password) => {
+        liveNetwork.send(mode === 'register' ? 'auth:register' : 'auth:login', { username, password });
         this.authStatus = 'CONTACTING CLOUD SERVICE...';
-        this.renderAuthOverlay();
-      });
-      this.authOverlay.querySelector('[data-auth-close]')?.addEventListener('click', () => {
-        if (this.promptLogin) this.close();
-        else this.open('root');
-      });
-    }
-    const status = this.authOverlay.querySelector('[data-auth-status]');
-    if (status) status.textContent = this.authStatus.startsWith('GUEST SESSION') ? 'GUEST SAVE: LOCAL ONLY' : this.authStatus;
-    this.authOverlay.hidden = this.page !== 'account';
+        setAuthOverlayStatus(this.authStatus);
+      },
+      onClose: () => this.open('root'),
+    });
+    const status = this.authStatus.startsWith('GUEST SESSION') ? 'GUEST SAVE: LOCAL ONLY' : this.authStatus;
+    showAuthOverlay({ gate: false, status });
   }
 
   private renderSocial() {
@@ -433,10 +404,10 @@ export class MenuScene extends Phaser.Scene {
 
   private connectDefaultWorld() {
     const save = gameStore.save;
-    if (!save) return;
+    if (!save || !canAttemptLiveConnection()) return;
     const stored = this.authToken || (() => { try { return JSON.parse(localStorage.getItem('generation-league:auth:v1') ?? '{}').token ?? ''; } catch { return ''; } })();
     this.authToken = stored;
-    if (!liveNetwork.isConnected()) {
+    if (!liveNetwork.hasLiveSocket()) {
       connectLiveWorldSession(save.location.mapId, save.location.x, save.location.y, { pingIntervalMs: 15_000 });
     }
   }
@@ -837,13 +808,13 @@ export class MenuScene extends Phaser.Scene {
     this.bagMode = 'browse'; this.cursor = Math.min(this.bagBrowseCursor, Math.max(0, this.bagStacks().length - 1)); this.render();
   }
 
-  private open(page: Page) { this.page = page; this.cursor = 0; this.summaryPage = 0; this.note = ''; if (page !== 'party') this.partyAction = false; if(page==='bag'){this.bagMode='browse';this.bagItemId='';this.bagBrowseCursor=0;this.bagQuantity=1;} this.render(); if (page !== 'account') this.renderAuthOverlay(); }
+  private open(page: Page) { this.page = page; this.cursor = 0; this.summaryPage = 0; this.note = ''; if (page !== 'party') this.partyAction = false; if(page==='bag'){this.bagMode='browse';this.bagItemId='';this.bagBrowseCursor=0;this.bagQuantity=1;} this.render(); if (page !== 'account') hideAuthOverlay(); }
   private back() {
     audio.sfx('cancel');
     if (this.page === 'shop' && this.shopBuying) { this.shopBuying=false;this.shopQuantity=1;this.note='';this.render(); }
     else if (this.page === 'root' || this.page === 'shop') this.close();
     else if (this.page === 'worlds') this.open('root');
-    else if (this.page === 'account') { if (this.promptLogin) this.close(); else this.open('root'); }
+    else if (this.page === 'account') this.open('root');
     else if (this.page === 'social' && this.selectedCard) { this.selectedCard = null; this.note = ''; this.render(); }
     else if (this.page === 'social') this.open('root');
     else if (this.page === 'party' && this.storageSwapIndex!==null) { this.storageSwapIndex=null;this.storage=true;this.cursor=this.partyIndex;this.note='';this.render(); }
@@ -862,9 +833,7 @@ export class MenuScene extends Phaser.Scene {
     this.socialChatDom = null;
     this.socialMessageObjects.forEach((object) => object.destroy());
     this.socialMessageObjects = [];
-    this.authOverlay?.remove();
-    this.authOverlay = null;
-    this.promptLogin = false;
+    hideAuthOverlay();
     this.scene.stop();
     this.scene.resume('Overworld');
     controls.clear();

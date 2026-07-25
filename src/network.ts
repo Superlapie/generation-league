@@ -63,7 +63,17 @@ export class GenerationNetworkClient {
   private suppressCloseEvent = false;
   latencyMs: number | null = null;
 
+  isConnected() { return this.socket?.readyState === WebSocket.OPEN; }
+
+  isConnecting() { return this.socket?.readyState === WebSocket.CONNECTING; }
+
+  hasLiveSocket() {
+    const state = this.socket?.readyState;
+    return state === WebSocket.CONNECTING || state === WebSocket.OPEN;
+  }
+
   connect(url: string, hello: Extract<ClientMessage, { type: 'hello' }>['payload'], options: { pingIntervalMs?: number } = {}) {
+    if (this.isConnecting()) return false;
     const pingIntervalMs = options.pingIntervalMs ?? 15_000;
     this.close();
     const socket = new WebSocket(url);
@@ -90,13 +100,12 @@ export class GenerationNetworkClient {
       if (!this.suppressCloseEvent) this.closeListeners.forEach((listener) => listener());
       this.suppressCloseEvent = false;
     });
+    return true;
   }
 
   onMessage(listener: (message: ServerMessage) => void) { this.listeners.add(listener); return () => this.listeners.delete(listener); }
 
   onClose(listener: () => void) { this.closeListeners.add(listener); return () => this.closeListeners.delete(listener); }
-
-  isConnected() { return this.socket?.readyState === WebSocket.OPEN; }
 
   send<T extends ClientMessage['type']>(type: T, payload: Extract<ClientMessage, { type: T }>['payload']) {
     if (this.socket?.readyState !== WebSocket.OPEN) return false;

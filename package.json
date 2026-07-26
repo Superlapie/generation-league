@@ -9,6 +9,7 @@
     "server": "node server/world-server.mjs",
     "build": "tsc -b && vite build",
     "assets:validate": "node scripts/validate-creature-assets.mjs",
+    "ui:validate": "node scripts/validate-ui.mjs",
     "check": "npm run assets:validate && tsc -b --pretty false && vitest run",
     "test": "vitest run",
     "preview": "vite preview --host 127.0.0.1"

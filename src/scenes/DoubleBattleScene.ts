@@ -137,19 +137,25 @@ export class DoubleBattleScene extends Phaser.Scene {
       const eRatio = Math.max(0, enemy.currentHp / eMax);
       const pRatio = Math.max(0, player.currentHp / pMax);
       const ep = this.add.graphics().setDepth(8);
-      ep.fillStyle(UI_COLORS.enemyPanel, 1).fillRect(ex, ey, 106, 28);
+      ep.fillStyle(UI_COLORS.shadow, 0.3).fillRect(ex + 2, ey + 2, 106, 28);
+      ep.fillStyle(UI_COLORS.surfaceDark, 0.96).fillRect(ex, ey, 106, 28);
+      ep.fillStyle(UI_COLORS.accentGold, 1).fillRect(ex, ey, 2, 28);
+      ep.lineStyle(1, UI_COLORS.borderLight, 0.72).strokeRect(ex, ey, 106, 28);
       ep.fillStyle(UI_COLORS.recessed, 1).fillRect(ex + 4, ey + 16, 88, 5);
-      label(this, ex + 6, ey + 5, `${this.enemyName(slot as 0 | 1).toUpperCase()} Lv${enemy.level}`, 6, '#182017', 9);
-      label(this, ex + 6, ey + 16, 'HP', 5, '#aa4b35', 9);
+      label(this, ex + 6, ey + 5, `${this.enemyName(slot as 0 | 1).toUpperCase()} Lv${enemy.level}`, 6, '#edf2dc', 9);
+      label(this, ex + 6, ey + 16, 'HP', 5, '#d2af42', 9);
       this.enemyBars[slot] = this.add.rectangle(ex + 23, ey + 18, 74 * eRatio, 2, eRatio > 0.5 ? 0x5ca85c : eRatio > 0.2 ? 0xd2a73d : 0xb74635).setOrigin(0).setDepth(10);
-      this.enemyHpText[slot] = label(this, ex + 98, ey + 22, `${enemy.currentHp}/${eMax}`, 5, '#52665c', 10).setOrigin(1, 0);
+      this.enemyHpText[slot] = label(this, ex + 98, ey + 22, `${enemy.currentHp}/${eMax}`, 5, '#a7baae', 10).setOrigin(1, 0);
       const pp = this.add.graphics().setDepth(8);
-      pp.fillStyle(UI_COLORS.playerPanel, 1).fillRect(px, py, 106, 28);
+      pp.fillStyle(UI_COLORS.shadow, 0.3).fillRect(px + 2, py + 2, 106, 28);
+      pp.fillStyle(UI_COLORS.surfaceDark, 0.96).fillRect(px, py, 106, 28);
+      pp.fillStyle(UI_COLORS.accentTeal, 1).fillRect(px, py, 2, 28);
+      pp.lineStyle(1, UI_COLORS.borderLight, 0.72).strokeRect(px, py, 106, 28);
       pp.fillStyle(UI_COLORS.recessed, 1).fillRect(px + 4, py + 16, 88, 5);
-      label(this, px + 6, py + 5, `${this.playerName(slot as 0 | 1).toUpperCase()} Lv${player.level}`, 6, '#182017', 9);
-      label(this, px + 6, py + 16, 'HP', 5, '#aa4b35', 9);
+      label(this, px + 6, py + 5, `${this.playerName(slot as 0 | 1).toUpperCase()} Lv${player.level}`, 6, '#edf2dc', 9);
+      label(this, px + 6, py + 16, 'HP', 5, '#63a8ad', 9);
       this.playerBars[slot] = this.add.rectangle(px + 23, py + 18, 74 * pRatio, 2, pRatio > 0.5 ? 0x5ca85c : pRatio > 0.2 ? 0xd2a73d : 0xb74635).setOrigin(0).setDepth(10);
-      this.playerHpText[slot] = label(this, px + 98, py + 22, `${player.currentHp}/${pMax}`, 5, '#52665c', 10).setOrigin(1, 0);
+      this.playerHpText[slot] = label(this, px + 98, py + 22, `${player.currentHp}/${pMax}`, 5, '#a7baae', 10).setOrigin(1, 0);
     });
     this.updateHpBars();
   }
@@ -171,13 +177,13 @@ export class DoubleBattleScene extends Phaser.Scene {
     if (this.mode === 'moves') {
       const creature = this.player(this.commandSlot);
       const names = Array.from({ length: 4 }, (_, index) => creature.moves[index] ? MOVES[creature.moves[index].moveId].name : '---');
-      drawCommandGrid(this, names, this.cursor, names.map((n) => n === '---'), this.sink, (i) => { this.cursor = i; this.choose(); });
+      drawCommandGrid(this, names, this.cursor, names.map((n) => n === '---'), this.sink, (i) => { this.cursor = i; this.choose(); }, false);
       this.uiObjects.push(label(this, 120, 151, 'A: CHOOSE MOVE   B: BACK', 5, '#f1f1d0', 30).setOrigin(0.5, 0));
       return;
     }
     if (this.mode === 'target') {
       const names = [this.enemyName(0), this.enemyName(1)];
-      drawCommandGrid(this, names, this.cursor, [false, false], this.sink, (i) => { this.cursor = i; this.choose(); });
+      drawCommandGrid(this, names, this.cursor, [false, false], this.sink, (i) => { this.cursor = i; this.choose(); }, false);
       this.uiObjects.push(label(this, 120, 151, 'A: TARGET   B: BACK', 5, '#f1f1d0', 30).setOrigin(0.5, 0));
       return;
     }

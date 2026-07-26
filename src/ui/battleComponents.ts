@@ -1,18 +1,16 @@
 import Phaser from 'phaser';
-import type { CreatureInstance, ItemDefinition } from '../types';
+import type { CreatureInstance } from '../types';
 import { ITEMS, MOVES, SPECIES } from '../data';
 import { calculateStats } from '../rules';
 import { UI_COLORS } from './theme';
-import { BATTLE_CMD_GRID, gridCell } from './layout';
+import { BATTLE_CMD_GRID, gridCell, pageWindow } from './layout';
 import { BATTLE_CMD_ICONS } from './icons';
-import { addText, textStyle } from './typography';
+import { addText, wrapBitmapText } from './typography';
 import {
-  raisedPanel, recessedPanel, drawHpMeter, drawListRow, drawDialogueBox,
-  drawEmptyState, keep, type UiSink,
+  drawHpMeter, keep, type UiSink,
 } from './primitives';
 import { renderItemIcon } from './menuComponents';
-import { drawSelectionCursor, selectionFill, selectionTextColor } from './cursor';
-import { hpColor } from './theme';
+import { drawSelectionCursor } from './cursor';
 
 import { arenaPaletteForMap, type ArenaPalette } from './constants';
 
@@ -55,11 +53,15 @@ export function drawEnemyStatusPanel(
   level: number,
   ratio: number,
 ): StatusPanelRefs {
-  raisedPanel(scene, x, y, 112, 32, UI_COLORS.enemyPanel, 8);
-  recessedPanel(scene, x + 4, y + 20, 88, 7, 9);
-  const nameText = addText(scene, x + 7, y + 5, `${name.toUpperCase()}  Lv${level}`, 'menuLabel', undefined, 10);
+  const panel = scene.add.graphics().setDepth(8);
+  panel.fillStyle(UI_COLORS.shadow, 0.42).fillRect(x + 2, y + 2, 112, 32);
+  panel.fillStyle(UI_COLORS.surfaceDark, 0.96).fillRect(x, y, 112, 32);
+  panel.lineStyle(1, UI_COLORS.borderLight, 0.75).strokeRect(x, y, 112, 32);
+  panel.fillStyle(UI_COLORS.accentGold, 1).fillRect(x, y, 2, 32);
+  panel.fillStyle(0xffffff, 0.07).fillRect(x + 2, y + 1, 109, 1);
+  const nameText = addText(scene, x + 7, y + 5, `${name.toUpperCase()}  Lv${level}`, 'menuLabel', '#f1f1d0', 10);
   const statusText = addText(scene, x + 105, y + 5, '', 'badge', '#9f4034', 10).setOrigin(1, 0);
-  addText(scene, x + 7, y + 21, 'HP', 'badge', '#aa4b35', 10);
+  addText(scene, x + 7, y + 21, 'HP', 'badge', '#d2af42', 10);
   const hpMeter = drawHpMeter(scene, x + 22, y + 22, 82, 5, ratio, 10);
   return { nameText, statusText, hpMeter };
 }
@@ -75,13 +77,17 @@ export function drawPlayerStatusPanel(
   maxHp: number,
   party: CreatureInstance[],
 ): StatusPanelRefs {
-  raisedPanel(scene, x, y, 108, 34, UI_COLORS.playerPanel, 8);
-  recessedPanel(scene, x + 4, y + 20, 78, 7, 9);
-  const nameText = addText(scene, x + 7, y + 5, `${name.toUpperCase()}  Lv${level}`, 'menuLabel', undefined, 10);
+  const panel = scene.add.graphics().setDepth(8);
+  panel.fillStyle(UI_COLORS.shadow, 0.42).fillRect(x + 2, y + 2, 108, 34);
+  panel.fillStyle(UI_COLORS.surfaceDark, 0.96).fillRect(x, y, 108, 34);
+  panel.lineStyle(1, UI_COLORS.borderLight, 0.75).strokeRect(x, y, 108, 34);
+  panel.fillStyle(UI_COLORS.accentTeal, 1).fillRect(x, y, 2, 34);
+  panel.fillStyle(0xffffff, 0.07).fillRect(x + 2, y + 1, 105, 1);
+  const nameText = addText(scene, x + 7, y + 5, `${name.toUpperCase()}  Lv${level}`, 'menuLabel', '#f1f1d0', 10);
   const statusText = addText(scene, x + 101, y + 5, '', 'badge', '#9f4034', 10).setOrigin(1, 0);
-  addText(scene, x + 7, y + 21, 'HP', 'badge', '#aa4b35', 10);
+  addText(scene, x + 7, y + 21, 'HP', 'badge', '#6eaaa0', 10);
   const hpMeter = drawHpMeter(scene, x + 22, y + 22, 72, 5, ratio, 10);
-  const hpText = addText(scene, x + 101, y + 28, `${currentHp}/${maxHp}`, 'compact', '#52665c', 10).setOrigin(1, 0);
+  const hpText = addText(scene, x + 101, y + 27, `${currentHp}/${maxHp}`, 'compact', '#b7c7b8', 10).setOrigin(1, 0);
   const partyDots = party.map((c, i) =>
     scene.add.circle(x + 8 + i * 7, y + 30, 2, c.currentHp > 0 ? UI_COLORS.accentGold : UI_COLORS.disabled)
       .setStrokeStyle(1, UI_COLORS.borderDeep).setDepth(10),
@@ -90,8 +96,12 @@ export function drawPlayerStatusPanel(
 }
 
 export function drawBattleDialogue(scene: Phaser.Scene): Phaser.GameObjects.Text {
-  drawDialogueBox(scene, 3, 113, 234, 44, 15);
-  return scene.add.text(11, 121, '', textStyle('dialogue')).setDepth(16).setWordWrapWidth(214);
+  const panel = scene.add.graphics().setDepth(15);
+  panel.fillStyle(UI_COLORS.shadow, 0.45).fillRect(4, 115, 234, 43);
+  panel.fillStyle(UI_COLORS.surfaceDark, 0.97).fillRect(3, 113, 234, 44);
+  panel.lineStyle(1, UI_COLORS.borderLight, 0.72).strokeRect(3, 113, 234, 44);
+  panel.fillStyle(UI_COLORS.accentTeal, 1).fillRect(3, 113, 2, 44);
+  return addText(scene, 11, 121, '', 'dialogue', '#edf2dc', 16);
 }
 
 export function drawCommandGrid(
@@ -101,21 +111,29 @@ export function drawCommandGrid(
   disabled: boolean[],
   sink: UiSink,
   onSelect: (index: number) => void,
+  showIcons = true,
 ): void {
+  const dock = scene.add.graphics().setDepth(19);
+  dock.fillStyle(UI_COLORS.surfaceVoid, 0.98).fillRect(3, 113, 234, 44);
+  dock.lineStyle(1, UI_COLORS.borderLight, 0.65).strokeRect(3, 113, 234, 44);
+  dock.fillStyle(UI_COLORS.accentTeal, 1).fillRect(3, 113, 2, 44);
+  keep(sink, dock);
   labels.forEach((label, index) => {
     const cell = gridCell(BATTLE_CMD_GRID, index, 4);
     const selected = index === cursor;
     const off = disabled[index] ?? false;
-    const bg = scene.add.rectangle(cell.x, cell.y, cell.w, cell.h, selectionFill(selected, off)).setOrigin(0).setDepth(20);
+    const fill = off ? UI_COLORS.recessed : selected ? UI_COLORS.selection : UI_COLORS.surfaceLight;
+    const bg = scene.add.rectangle(cell.x, cell.y, cell.w, cell.h, fill).setOrigin(0).setDepth(20)
+      .setStrokeStyle(1, selected ? UI_COLORS.accentGold : UI_COLORS.borderLight, selected ? 0.8 : 0.22);
     if (!off) bg.setInteractive({ useHandCursor: true }).on('pointerdown', () => onSelect(index));
     keep(sink, bg);
     const cur = drawSelectionCursor(scene, cell.x, cell.y, cell.w, cell.h, selected && !off, { depth: 22 });
     if (cur) keep(sink, cur);
-    const iconKey = BATTLE_CMD_ICONS[index];
+    const iconKey = showIcons ? BATTLE_CMD_ICONS[index] : undefined;
     if (iconKey && scene.textures.exists(iconKey)) {
-      keep(sink, scene.add.image(cell.x + 6, cell.y + Math.floor(cell.h / 2), iconKey).setDepth(21));
+      keep(sink, scene.add.image(cell.x + 10, cell.y + Math.floor(cell.h / 2), iconKey).setDisplaySize(14, 14).setDepth(21));
     }
-    keep(sink, addText(scene, cell.x + 18, cell.y + Math.floor(cell.h / 2) - 4, label.toUpperCase(), 'menuLabel', selectionTextColor(selected, off), 21));
+    keep(sink, addText(scene, cell.x + (showIcons ? 21 : 8), cell.y + Math.floor(cell.h / 2) - 4, label.toUpperCase(), 'menuLabel', off ? '#718477' : '#edf2dc', 21));
   });
 }
 
@@ -137,12 +155,18 @@ export function drawMoveGrid(
   sink: UiSink,
   onSelect: (index: number) => void,
 ): void {
+  const dock = scene.add.graphics().setDepth(19);
+  dock.fillStyle(UI_COLORS.surfaceVoid, 0.98).fillRect(3, 112, 234, 46);
+  dock.lineStyle(1, UI_COLORS.borderLight, 0.65).strokeRect(3, 112, 234, 46);
+  dock.fillStyle(UI_COLORS.accentGold, 1).fillRect(3, 112, 2, 46);
+  keep(sink, dock);
   moves.forEach((move, index) => {
-    const cell = gridCell({ x: 6, y: 116, w: 228, h: 34, cols: 2, rows: 2 }, index, 3);
+    const cell = gridCell({ x: 6, y: 114, w: 228, h: 35, cols: 2, rows: 2 }, index, 2);
     const selected = index === cursor;
     const off = move.disabled || move.empty;
-    const fill = move.empty ? UI_COLORS.recessed : selectionFill(selected, off);
-    const bg = scene.add.rectangle(cell.x, cell.y, cell.w, cell.h, fill).setOrigin(0).setDepth(20);
+    const fill = off ? UI_COLORS.recessed : selected ? UI_COLORS.selection : UI_COLORS.surfaceLight;
+    const bg = scene.add.rectangle(cell.x, cell.y, cell.w, cell.h, fill).setOrigin(0).setDepth(20)
+      .setStrokeStyle(1, selected ? UI_COLORS.accentGold : UI_COLORS.borderLight, selected ? 0.8 : 0.2);
     if (!off) bg.setInteractive({ useHandCursor: true }).on('pointerdown', () => onSelect(index));
     keep(sink, bg);
     if (selected && !off) {
@@ -155,10 +179,10 @@ export function drawMoveGrid(
     }
     const catIcon = move.category === 'Physical' ? 'ui-icon-move-physical'
       : move.category === 'Special' ? 'ui-icon-move-special' : 'ui-icon-move-status';
-    if (scene.textures.exists(catIcon)) keep(sink, scene.add.image(cell.x + 4, cell.y + 4, catIcon).setDepth(21));
-    const nameColor = move.struggle ? '#9f4034' : selectionTextColor(selected, off);
-    keep(sink, addText(scene, cell.x + 14, cell.y + 3, move.name.toUpperCase(), 'menuLabel', nameColor, 21));
-    keep(sink, addText(scene, cell.x + 14, cell.y + 12, `${move.type}  ${move.pp}/${move.maxPp}`, 'compact', selectionTextColor(selected, off), 21));
+    if (scene.textures.exists(catIcon)) keep(sink, scene.add.image(cell.x + 7, cell.y + 8, catIcon).setDisplaySize(10, 10).setDepth(21));
+    const nameColor = move.struggle ? '#e7a08f' : '#edf2dc';
+    keep(sink, addText(scene, cell.x + 14, cell.y + 2, move.name.toUpperCase(), 'menuLabel', nameColor, 21));
+    keep(sink, addText(scene, cell.x + 14, cell.y + 9, `${move.type.toUpperCase()}  ${move.pp}/${move.maxPp} PP`, 'tinyHint', '#b7c7b8', 21));
   });
 }
 
@@ -168,11 +192,11 @@ export function drawMoveDetailFooter(
   noPp: boolean,
   sink: UiSink,
 ): void {
-  const bg = scene.add.rectangle(6, 150, 228, 8, UI_COLORS.borderDeep).setOrigin(0).setDepth(29);
+  const bg = scene.add.rectangle(6, 151, 228, 6, UI_COLORS.surfaceMid).setOrigin(0).setDepth(29);
   keep(sink, bg);
   const acc = move.accuracy !== undefined ? `  ACC ${move.accuracy}` : '';
   const text = noPp ? 'NO PP — STRUGGLE' : `PP ${move.pp}/${move.maxPp}  ${move.type.toUpperCase()}  PWR ${move.power}${acc}  ${move.category.toUpperCase()}`;
-  keep(sink, addText(scene, 120, 150, text, 'compact', '#f1f1d0', 30).setOrigin(0.5, 0));
+  keep(sink, addText(scene, 120, 151, text, 'tinyHint', '#dbe5cf', 30).setOrigin(0.5, 0));
 }
 
 export function drawBattleBagModal(
@@ -185,38 +209,56 @@ export function drawBattleBagModal(
   sink: UiSink,
   onSelect: (index: number) => void,
 ): void {
-  keep(sink, scene.add.rectangle(0, 0, 240, 160, 0x0b1610, 0.78).setOrigin(0).setDepth(25));
-  keep(sink, raisedPanel(scene, 6, 7, 228, 146, UI_COLORS.battlePaper, 26));
-  keep(sink, recessedPanel(scene, 10, 11, 218, 14, 27));
-  keep(sink, addText(scene, 14, 14, opts.title ?? 'BATTLE BAG', 'panelTitle', undefined, 28));
-  keep(sink, addText(scene, 226, 14, 'A: USE  B: BACK', 'compact', '#59684f', 28).setOrigin(1, 0));
-  keep(sink, scene.add.rectangle(118, 30, 2, 108, UI_COLORS.recessed).setOrigin(0).setDepth(27));
+  const shell = scene.add.graphics().setDepth(25);
+  shell.fillStyle(UI_COLORS.surfaceVoid, 0.97).fillRect(0, 0, 240, 160);
+  shell.fillGradientStyle(UI_COLORS.surfaceRaised, UI_COLORS.surfaceMid, UI_COLORS.surfaceDark, UI_COLORS.surfaceDark, 1).fillRect(4, 4, 232, 22);
+  shell.fillStyle(UI_COLORS.accentGold, 1).fillRect(4, 4, 2, 22);
+  shell.lineStyle(1, UI_COLORS.borderLight, 0.7).strokeRect(4, 4, 232, 152);
+  shell.fillStyle(UI_COLORS.surfaceDark, 1).fillRect(8, 30, 100, 108);
+  shell.fillStyle(UI_COLORS.surfaceMid, 1).fillRect(112, 30, 120, 108);
+  shell.lineStyle(1, UI_COLORS.borderLight, 0.32).strokeRect(8, 30, 100, 108).strokeRect(112, 30, 120, 108);
+  keep(sink, shell);
+  keep(sink, scene.add.image(16, 15, 'ui-icon-battle-bag').setDisplaySize(15, 15).setDepth(27));
+  keep(sink, addText(scene, 28, 8, opts.title ?? 'BATTLE BAG', 'panelTitle', '#edf2dc', 28));
+  keep(sink, addText(scene, 228, 9, 'A USE   B BACK', 'tinyHint', '#d2af42', 28).setOrigin(1, 0));
 
   if (!opts.items.length) {
-    drawEmptyState(scene, 12, 50, 100, 'No items', 'No usable battle items right now.', 'ui-icon-empty', sink);
+    keep(sink, scene.add.image(58, 65, 'ui-icon-empty').setDisplaySize(22, 22).setDepth(28));
+    keep(sink, addText(scene, 58, 82, 'NO ITEMS', 'panelTitle', '#b7c7b8', 28).setOrigin(0.5, 0));
+    keep(sink, addText(scene, 58, 95, 'Nothing usable\nin this battle.', 'compact', '#718477', 28).setOrigin(0.5, 0));
+    keep(sink, addText(scene, 172, 78, 'Your usable recovery\nand capture items\nappear here.', 'compact', '#718477', 28).setOrigin(0.5, 0));
     return;
   }
 
-  opts.items.forEach((stack, index) => {
-    const y = 36 + index * 16;
-    drawListRow(scene, {
-      x: 12, y, w: 100, h: 14,
-      label: ITEMS[stack.itemId].name,
-      right: `×${stack.count}`,
-      selected: index === opts.cursor,
-      onClick: () => onSelect(index),
-    }, sink);
+  const { start, end } = pageWindow(opts.cursor, opts.items.length, 6);
+  opts.items.slice(start, end).forEach((stack, row) => {
+    const index = start + row;
+    const item = ITEMS[stack.itemId];
+    const y = 34 + row * 17;
+    const selected = index === opts.cursor;
+    const bg = scene.add.rectangle(12, y, 92, 15, selected ? UI_COLORS.selection : UI_COLORS.surfaceLight)
+      .setOrigin(0).setDepth(27)
+      .setStrokeStyle(1, selected ? UI_COLORS.accentGold : UI_COLORS.borderLight, selected ? 0.8 : 0.15)
+      .setInteractive({ useHandCursor: true }).on('pointerdown', () => onSelect(index));
+    keep(sink, bg);
+    keep(sink, addText(scene, 17, y + 4, item.name, 'compact', '#edf2dc', 28));
+    keep(sink, addText(scene, 100, y + 4, `x${stack.count}`, 'numeric', selected ? '#f1d77b' : '#b7c7b8', 28).setOrigin(1, 0));
   });
+  if (start > 0) keep(sink, addText(scene, 105, 30, '▲', 'tinyHint', '#d2af42', 28).setOrigin(1, 0));
+  if (end < opts.items.length) keep(sink, addText(scene, 105, 130, '▼', 'tinyHint', '#d2af42', 28).setOrigin(1, 0));
 
   const stack = opts.items[opts.cursor];
   if (stack) {
     const item = ITEMS[stack.itemId];
-    keep(sink, recessedPanel(scene, 124, 36, 104, 48, 28));
-    renderItemIcon(scene, item, 176, 52, sink);
-    keep(sink, addText(scene, 128, 68, item.name.toUpperCase(), 'menuLabel', undefined, 28));
-    keep(sink, addText(scene, 128, 78, item.category.toUpperCase(), 'compact', '#7b6843', 28));
-    keep(sink, scene.add.text(128, 88, item.description, textStyle('compact')).setDepth(28).setWordWrapWidth(96).setMaxLines(3));
-    keep(sink, addText(scene, 128, 118, `OWNED ${stack.count}`, 'compact', '#7b6843', 28));
+    const iconWell = scene.add.graphics().setDepth(27);
+    iconWell.fillStyle(UI_COLORS.surfaceVoid, 0.75).fillRect(118, 36, 108, 38);
+    iconWell.lineStyle(1, UI_COLORS.borderLight, 0.28).strokeRect(118, 36, 108, 38);
+    keep(sink, iconWell);
+    renderItemIcon(scene, item, 172, 54, sink, 28);
+    keep(sink, addText(scene, 120, 80, item.name.toUpperCase(), 'panelTitle', '#edf2dc', 28));
+    keep(sink, addText(scene, 120, 91, item.category.toUpperCase(), 'badge', '#d2af42', 28));
+    keep(sink, addText(scene, 120, 101, wrapBitmapText(item.description, 24, 3), 'compact', '#b7c7b8', 28));
+    keep(sink, addText(scene, 120, 127, `OWNED  ${stack.count}`, 'compact', '#d2af42', 28));
   }
 }
 
@@ -233,15 +275,19 @@ export function drawBattlePartyModal(
   sink: UiSink,
   onSelect: (index: number) => void,
 ): void {
-  keep(sink, scene.add.rectangle(0, 0, 240, 160, 0x0b1610, 0.78).setOrigin(0).setDepth(25));
-  keep(sink, raisedPanel(scene, 6, 7, 228, 146, UI_COLORS.battlePaper, 26));
-  keep(sink, recessedPanel(scene, 10, 11, 218, 14, 27));
-  keep(sink, addText(scene, 14, 14, opts.title, 'panelTitle', undefined, 28));
-  keep(sink, addText(scene, 226, 14, 'A: CHOOSE  B: BACK', 'compact', '#59684f', 28).setOrigin(1, 0));
+  const shell = scene.add.graphics().setDepth(25);
+  shell.fillStyle(UI_COLORS.surfaceVoid, 0.97).fillRect(0, 0, 240, 160);
+  shell.fillGradientStyle(UI_COLORS.surfaceRaised, UI_COLORS.surfaceMid, UI_COLORS.surfaceDark, UI_COLORS.surfaceDark, 1).fillRect(4, 4, 232, 22);
+  shell.fillStyle(UI_COLORS.accentTeal, 1).fillRect(4, 4, 2, 22);
+  shell.lineStyle(1, UI_COLORS.borderLight, 0.7).strokeRect(4, 4, 232, 152);
+  shell.fillStyle(UI_COLORS.surfaceDark, 1).fillRect(8, 30, 224, 108);
+  shell.lineStyle(1, UI_COLORS.borderLight, 0.32).strokeRect(8, 30, 224, 108);
+  keep(sink, shell);
+  keep(sink, scene.add.image(16, 15, 'ui-icon-party').setDisplaySize(15, 15).setDepth(27));
+  keep(sink, addText(scene, 28, 8, opts.title, 'panelTitle', '#edf2dc', 28));
+  keep(sink, addText(scene, 228, 9, 'A CHOOSE   B BACK', 'tinyHint', '#d2af42', 28).setOrigin(1, 0));
 
-  const count = opts.party.length;
-  const compact = count > 3;
-  const rowH = compact ? 16 : 22;
+  const rowH = 17;
 
   opts.party.forEach((creature, index) => {
     const species = SPECIES[creature.speciesId];
@@ -249,37 +295,21 @@ export function drawBattlePartyModal(
     const ratio = Math.max(0, creature.currentHp / max);
     const fainted = creature.currentHp <= 0;
     const active = opts.activeIndices?.includes(index) ?? index === opts.activeIndex;
-    const y = 32 + index * rowH;
+    const y = 33 + index * rowH;
     const selected = index === opts.cursor;
-
-    if (compact) {
-      drawListRow(scene, {
-        x: 12, y, w: 214, h: rowH - 2,
-        label: (creature.nickname || species.name).toUpperCase(),
-        right: `${creature.currentHp}/${max}`,
-        selected,
-        disabled: fainted,
-        onClick: () => onSelect(index),
-      }, sink);
-      const m = drawHpMeter(scene, 100, y + 11, 80, 2, ratio, 29);
-      keep(sink, m.bg);
-      keep(sink, m.fill);
-    } else {
-      keep(sink, raisedPanel(scene, 12, y, 214, rowH - 2, selectionFill(selected, fainted), 27));
-      if (selected && !fainted) {
-        const cur = drawSelectionCursor(scene, 12, y, 214, rowH - 2, true, { depth: 29 });
-        if (cur) keep(sink, cur);
-      }
-      if (!fainted) scene.add.rectangle(12, y, 214, rowH - 2, 0).setOrigin(0).setDepth(28).setInteractive({ useHandCursor: true }).on('pointerdown', () => onSelect(index));
-      keep(sink, scene.add.image(22, y + Math.floor(rowH / 2), `${species.id}-front`).setDisplaySize(18, 18).setDepth(28).setTint(fainted ? 0x666666 : 0xffffff));
-      keep(sink, addText(scene, 34, y + 4, (creature.nickname || species.name).toUpperCase(), 'menuLabel', selectionTextColor(selected, fainted), 28));
-      keep(sink, addText(scene, 34, y + 13, `Lv${creature.level}  ${creature.currentHp}/${max}`, 'compact', selectionTextColor(selected, fainted), 28));
-      const m = drawHpMeter(scene, 120, y + 12, 96, 3, ratio, 29);
-      keep(sink, m.bg);
-      keep(sink, m.fill);
-    }
-    if (active) keep(sink, addText(scene, 210, y + 4, 'ACTIVE', 'badge', '#7b6843', 29).setOrigin(1, 0));
-    if (fainted) keep(sink, addText(scene, 210, y + 4, 'FAINTED', 'badge', '#9f4034', 29).setOrigin(1, 0));
+    const fill = fainted ? UI_COLORS.recessed : selected ? UI_COLORS.selection : UI_COLORS.surfaceLight;
+    const card = scene.add.rectangle(12, y, 216, 15, fill).setOrigin(0).setDepth(27)
+      .setStrokeStyle(1, selected ? UI_COLORS.accentGold : UI_COLORS.borderLight, selected ? 0.8 : 0.15);
+    if (!fainted) card.setInteractive({ useHandCursor: true }).on('pointerdown', () => onSelect(index));
+    keep(sink, card);
+    keep(sink, scene.add.image(22, y + 8, `${species.id}-front`).setDisplaySize(17, 17).setDepth(28).setTint(fainted ? 0x666666 : 0xffffff));
+    keep(sink, addText(scene, 34, y + 2, (creature.nickname || species.name).toUpperCase(), 'menuLabel', fainted ? '#718477' : '#edf2dc', 28));
+    keep(sink, addText(scene, 34, y + 9, `Lv${creature.level}`, 'tinyHint', fainted ? '#59684f' : '#b7c7b8', 28));
+    const meter = drawHpMeter(scene, 72, y + 10, 78, 3, ratio, 29);
+    keep(sink, meter.bg);
+    keep(sink, meter.fill);
+    keep(sink, addText(scene, 157, y + 8, `${creature.currentHp}/${max}`, 'tinyHint', fainted ? '#59684f' : '#b7c7b8', 29));
+    if (active) keep(sink, addText(scene, 222, y + 4, 'ACTIVE', 'badge', '#d2af42', 29).setOrigin(1, 0));
+    if (fainted) keep(sink, addText(scene, 222, y + 4, 'FAINTED', 'badge', '#e7907d', 29).setOrigin(1, 0));
   });
 }
-

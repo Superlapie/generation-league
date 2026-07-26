@@ -2,24 +2,51 @@ import type Phaser from 'phaser';
 
 export const INTERNAL_WIDTH = 480;
 export const INTERNAL_HEIGHT = 320;
-const ASPECT_RATIO = INTERNAL_WIDTH / INTERNAL_HEIGHT;
 
 export function pickIntegerScale(availableWidth: number, availableHeight: number): number {
   if (availableWidth <= 0 || availableHeight <= 0) return 1;
   const maxScaleX = Math.floor(availableWidth / INTERNAL_WIDTH);
   const maxScaleY = Math.floor(availableHeight / INTERNAL_HEIGHT);
-  return Math.max(1, Math.min(maxScaleX, maxScaleY));
+  return Math.max(1, Math.min(3, maxScaleX, maxScaleY));
+}
+
+/**
+ * Desktop prefers hard integer presentation. A single 1.5x compact-shell step
+ * prevents an unnecessarily tiny 1x game when 2x is physically impossible.
+ */
+export function pickDesktopScale(availableWidth: number, availableHeight: number): number {
+  const integer = pickIntegerScale(availableWidth, availableHeight);
+  if (integer >= 2) return integer;
+  return availableWidth >= INTERNAL_WIDTH * 1.5 && availableHeight >= INTERNAL_HEIGHT * 1.5 ? 1.5 : 1;
 }
 
 export function pickFitScale(availableWidth: number, availableHeight: number): number {
   if (availableWidth <= 0 || availableHeight <= 0) return 1;
-  return Math.max(1, Math.min(availableWidth / INTERNAL_WIDTH, availableHeight / INTERNAL_HEIGHT));
+  return Math.max(0.1, Math.min(availableWidth / INTERNAL_WIDTH, availableHeight / INTERNAL_HEIGHT));
 }
 
 export function measureGameSlot(gameFrame?: HTMLElement | null): { width: number; height: number } {
   const playLayout = document.querySelector('.play-layout') as HTMLElement | null;
   const column = document.getElementById('game-column');
   const footer = document.querySelector('.game-footer') as HTMLElement | null;
+  const mobile = window.matchMedia('(max-width: 900px)').matches;
+
+  if (mobile) {
+    const shell = document.getElementById('app-shell');
+    const header = document.querySelector('.app-header') as HTMLElement | null;
+    const shellStyles = shell ? getComputedStyle(shell) : null;
+    const columnStyles = column ? getComputedStyle(column) : null;
+    const paddingY = shellStyles ? parseFloat(shellStyles.paddingTop) + parseFloat(shellStyles.paddingBottom) : 16;
+    const paddingX = shellStyles ? parseFloat(shellStyles.paddingLeft) + parseFloat(shellStyles.paddingRight) : 20;
+    const shellGap = shellStyles ? parseFloat(shellStyles.rowGap || shellStyles.gap || '8') : 8;
+    const columnGap = columnStyles ? parseFloat(columnStyles.rowGap || columnStyles.gap || '8') : 8;
+    const viewportWidth = window.visualViewport?.width ?? window.innerWidth;
+    const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+    return {
+      width: Math.max(1, Math.floor((column?.clientWidth || viewportWidth) - (column?.clientWidth ? 0 : paddingX))),
+      height: Math.max(1, Math.floor(viewportHeight - paddingY - (header?.offsetHeight ?? 52) - (footer?.offsetHeight ?? 22) - shellGap - columnGap)),
+    };
+  }
 
   let width = 0;
   let height = 0;
@@ -41,7 +68,6 @@ export function measureGameSlot(gameFrame?: HTMLElement | null): { width: number
     return { width, height };
   }
 
-  const desktop = window.matchMedia('(min-width: 901px)').matches;
   const shell = document.getElementById('app-shell');
   const header = document.querySelector('.app-header') as HTMLElement | null;
   const sidebar = document.getElementById('league-link');
@@ -59,14 +85,6 @@ export function measureGameSlot(gameFrame?: HTMLElement | null): { width: number
   const playGap = 12;
   const viewportWidth = window.visualViewport?.width ?? window.innerWidth;
   const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
-
-  if (!desktop) {
-    const fallbackWidth = Math.max(INTERNAL_WIDTH, viewportWidth - paddingX);
-    return {
-      width: fallbackWidth,
-      height: Math.max(INTERNAL_HEIGHT, Math.floor(fallbackWidth / ASPECT_RATIO)),
-    };
-  }
 
   return {
     width: Math.max(
@@ -104,10 +122,11 @@ export function initGameScale(gameFrame: HTMLElement, game: Phaser.Game) {
     }
 
     const { width: availableWidth, height: availableHeight } = measureGameSlot(gameFrame);
+    // Small shells are mobile layouts even when a desktop test runner reports a fine pointer.
     const mobile = window.matchMedia('(max-width: 900px)').matches;
-    const scale = pickFitScale(availableWidth, availableHeight);
-    const displayWidth = Math.max(INTERNAL_WIDTH, Math.round(INTERNAL_WIDTH * scale));
-    const displayHeight = Math.max(INTERNAL_HEIGHT, Math.round(INTERNAL_HEIGHT * scale));
+    const scale = mobile ? pickFitScale(availableWidth, availableHeight) : pickDesktopScale(availableWidth, availableHeight);
+    const displayWidth = Math.max(mobile ? 1 : INTERNAL_WIDTH, Math.round(INTERNAL_WIDTH * scale));
+    const displayHeight = Math.max(mobile ? 1 : INTERNAL_HEIGHT, Math.round(INTERNAL_HEIGHT * scale));
 
     root.style.setProperty('--game-scale', String(scale));
 
@@ -121,14 +140,14 @@ export function initGameScale(gameFrame: HTMLElement, game: Phaser.Game) {
     }
 
     if (gameHost) {
-      gameHost.style.width = `${INTERNAL_WIDTH}px`;
-      gameHost.style.height = `${INTERNAL_HEIGHT}px`;
-      gameHost.style.transform = mobile ? 'none' : `scale(${scale})`;
+      gameHost.style.width = `${displayWidth}px`;
+      gameHost.style.height = `${displayHeight}px`;
+      gameHost.style.transform = 'none';
       gameHost.style.transformOrigin = 'center center';
     }
 
-    canvas.style.removeProperty('width');
-    canvas.style.removeProperty('height');
+    canvas.style.width = `${displayWidth}px`;
+    canvas.style.height = `${displayHeight}px`;
     syncPhaserDom();
     game.scale.resize(INTERNAL_WIDTH, INTERNAL_HEIGHT);
     window.dispatchEvent(new CustomEvent('generation-league:game-scale'));

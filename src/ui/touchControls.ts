@@ -2,6 +2,7 @@
 
 export function shouldShowTouchControls(): boolean {
   if (typeof window === 'undefined') return false;
+  if (window.matchMedia('(max-width: 900px)').matches) return true;
   if (window.matchMedia('(pointer: coarse)').matches) return true;
   return navigator.maxTouchPoints > 0;
 }

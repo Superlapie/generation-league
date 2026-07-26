@@ -54,7 +54,9 @@
   top: auto;
   width: 100%;
   min-width: 0;
-  max-height: min(78vh, 640px);
+  /* A quick utility sheet, not a second full-screen app. */
+  height: min(40svh, 320px);
+  max-height: min(40svh, 320px);
   border-radius: 10px 10px 0 0;
   transform: translateY(100%);
   transition: transform 180ms ease;
@@ -634,7 +636,13 @@ body.ll-drawer-open .ll-drawer-scrim {
 }
 
 @media (max-width: 900px) {
-  .ll-launcher { display: inline-flex; }
+  .ll-launcher {
+    display: inline-flex;
+    min-height: 34px;
+    padding: 0 9px;
+    font-size: 8px;
+    box-shadow: 3px 3px 0 #08100b;
+  }
   .ll-notifications {
     top: calc(max(10px, env(safe-area-inset-top)) + 48px);
   }

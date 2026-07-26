@@ -5,8 +5,10 @@ const directionKeys: Record<BufferedDirection, GameKey> = { up: 'UP', down: 'DOW
 
 const keyMap: Record<string, GameKey | undefined> = {
   ArrowUp:'UP',KeyW:'UP',ArrowDown:'DOWN',KeyS:'DOWN',ArrowLeft:'LEFT',KeyA:'LEFT',ArrowRight:'RIGHT',KeyD:'RIGHT',
-  Enter:'A',KeyZ:'A',Space:'A',Escape:'B',KeyX:'B',KeyM:'MENU',ShiftLeft:'RUN',ShiftRight:'RUN',
+  Enter:'A',KeyZ:'A',Space:'MENU',Escape:'B',KeyX:'B',KeyM:'MENU',ShiftLeft:'RUN',ShiftRight:'RUN',
 };
+
+export function gameKeyForCode(code: string): GameKey | undefined { return keyMap[code]; }
 
 class Controls {
   private held = new Set<GameKey>();
@@ -19,13 +21,13 @@ class Controls {
     window.addEventListener('keydown', (event) => {
       const target = event.target as HTMLElement | null;
       if (target && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))) return;
-      const key = keyMap[event.code];
+      const key = gameKeyForCode(event.code);
       if (!key) return;
       if (!this.held.has(key)) { this.fresh.add(key); this.bufferDirection(key); }
       this.held.add(key);
       event.preventDefault();
     });
-    window.addEventListener('keyup', (event) => { const key = keyMap[event.code]; if (!key) return; this.held.delete(key); event.preventDefault(); });
+    window.addEventListener('keyup', (event) => { const key = gameKeyForCode(event.code); if (!key) return; this.held.delete(key); event.preventDefault(); });
     document.querySelectorAll<HTMLButtonElement>('[data-key]').forEach((button) => {
       const key = button.dataset.key as GameKey;
       const down = (event: Event) => { event.preventDefault(); if (!this.held.has(key)) { this.fresh.add(key); this.bufferDirection(key); } this.held.add(key); };

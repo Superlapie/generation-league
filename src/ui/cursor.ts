@@ -22,22 +22,12 @@ export function drawSelectionCursor(
   const depth = options.depth ?? UI_DEPTH.cursor;
   const g = scene.add.graphics().setDepth(depth);
   const rail = options.rail !== false;
-  const brackets = options.brackets !== false;
-
   if (rail) {
-    g.fillStyle(UI_COLORS.selectionRail, 1).fillRect(x, y, 2, h);
+    g.fillStyle(UI_COLORS.selectionRail, 1).fillRect(x, y + 2, 2, Math.max(1, h - 4));
   }
-  if (brackets) {
-    g.lineStyle(1, UI_COLORS.accentLime, 1);
-    // top-left
-    g.beginPath().moveTo(x + 1, y + 4).lineTo(x + 1, y + 1).lineTo(x + 4, y + 1).strokePath();
-    // bottom-left
-    g.beginPath().moveTo(x + 1, y + h - 5).lineTo(x + 1, y + h - 2).lineTo(x + 4, y + h - 2).strokePath();
-    // top-right
-    g.beginPath().moveTo(x + w - 5, y + 1).lineTo(x + w - 2, y + 1).lineTo(x + w - 2, y + 4).strokePath();
-    // bottom-right
-    g.beginPath().moveTo(x + w - 5, y + h - 2).lineTo(x + w - 2, y + h - 2).lineTo(x + w - 2, y + h - 5).strokePath();
-  }
+  g.lineStyle(1, UI_COLORS.accentGoldSoft, options.brackets === false ? 0.35 : 0.7)
+    .strokeRect(x + 2, y, w - 2, h);
+  g.fillStyle(0xffffff, 0.09).fillRect(x + 3, y + 1, w - 4, 1);
   return g;
 }
 

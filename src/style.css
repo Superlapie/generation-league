@@ -199,8 +199,47 @@ button:focus-visible {
   pointer-events: none;
 }
 
+.desktop-menu-control {
+  display: none;
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  z-index: 55;
+  min-height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--border-light);
+  color: var(--text-primary);
+  background: rgba(16, 25, 20, 0.92);
+  box-shadow: 3px 3px 0 #08100b;
+  cursor: pointer;
+  font: 9px var(--font-pixel);
+  letter-spacing: .06em;
+}
+
+.desktop-menu-control:hover,
+.desktop-menu-control:focus-visible {
+  color: #13221b;
+  background: var(--accent-lime);
+  border-color: var(--accent-lime);
+}
+
+.desktop-menu-control kbd {
+  margin-left: 5px;
+  color: var(--accent-lime);
+  font: inherit;
+  font-size: 7px;
+}
+
+@media (min-width: 901px) and (pointer: fine) {
+  .desktop-menu-control { display: inline-flex; align-items: center; }
+}
+
 body[data-touch-input="true"] #touch-controls {
   display: block;
+}
+
+@media (pointer: fine) and (min-width: 901px) {
+  #touch-controls, body[data-touch-input="true"] #touch-controls { display: none; pointer-events: none; }
 }
 
 .game-footer {
@@ -422,9 +461,12 @@ body.ll-drawer-open #league-link.is-drawer {
 
   #game-shell {
     width: 100%;
+    display: block;
   }
 
   #game {
+    position: absolute;
+    inset: 0;
     width: 100%;
     height: auto;
     transform: none;
@@ -441,6 +483,8 @@ body.ll-drawer-open #league-link.is-drawer {
   .app-sidebar-toggle {
     display: none;
   }
+
+  .desktop-menu-control { display: none; }
 
   .game-footer {
     flex-wrap: wrap;
@@ -480,6 +524,7 @@ body.ll-drawer-open #league-link.is-drawer {
     margin-bottom: 104px;
   }
 
+  #game-shell,
   #game {
     overflow: visible;
   }
@@ -492,10 +537,64 @@ body.ll-drawer-open #league-link.is-drawer {
   .action-pad { top: calc(100% + 25px); bottom: auto; }
   .touch-menu { top: calc(100% + 78px); bottom: auto; }
 
-  .ll-launcher {
-    top: auto;
-    bottom: max(10px, env(safe-area-inset-bottom));
-    right: max(10px, env(safe-area-inset-right));
+  #game-frame > .ll-launcher {
+    top: calc(100% + 12px);
+    bottom: auto;
+    right: 50%;
+    transform: translateX(50%);
+  }
+}
+
+@media (orientation: landscape) and (max-width: 900px) and (max-height: 500px) {
+  #game-shell,
+  #game,
+  #touch-controls {
+    overflow: visible;
+  }
+
+  .dpad {
+    width: 62px;
+    height: 62px;
+    left: 7px;
+    bottom: 7px;
+  }
+
+  .dpad button {
+    width: 22px;
+    height: 22px;
+  }
+
+  .dpad [data-key="UP"] { left: 20px; }
+  .dpad [data-key="LEFT"] { top: 20px; }
+  .dpad [data-key="RIGHT"] { top: 20px; }
+  .dpad [data-key="DOWN"] { left: 20px; }
+
+  .action-pad {
+    right: 7px;
+    bottom: 9px;
+    width: 68px;
+    height: 43px;
+  }
+
+  .action-pad button {
+    width: 31px;
+    height: 31px;
+  }
+
+  .touch-menu {
+    right: 50%;
+    bottom: 4px;
+    transform: translateX(50%);
+  }
+}
+
+@media (orientation: landscape) and (min-width: 760px) and (max-width: 900px) and (max-height: 500px) {
+  .dpad { left: -88px; }
+  .action-pad { right: -88px; }
+  .touch-menu {
+    right: -72px;
+    bottom: 58px;
+    transform: none;
   }
 }
 

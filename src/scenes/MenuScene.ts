@@ -25,6 +25,7 @@ import {
 } from '../ui/menuComponents';
 import { ROOT_ENTRIES, POCKET_DEFS } from '../ui/constants';
 import { drawPageBackground, drawPageHeader, drawHelpBar, raisedPanel, addText, keep } from '../ui/primitives';
+import { wrapBitmapText } from '../ui/typography';
 
 type MenuMode = 'pause' | 'shop';
 type Page = 'root' | 'party' | 'summary' | 'bag' | 'guide' | 'card' | 'options' | 'shop' | 'account';
@@ -392,7 +393,7 @@ export class MenuScene extends Phaser.Scene {
     if (item) {
       renderItemIcon(this, item, 188, 48, this.sink);
       keep(this.sink, addText(this, 149, 68, item.name.toUpperCase(), 'menuLabel', undefined, 6));
-      keep(this.sink, this.add.text(149, 81, item.description, { fontFamily: '"Generation Pixel", monospace', fontSize: '6px', color: '#52665c', resolution: 4 }).setDepth(6).setWordWrapWidth(77));
+      keep(this.sink, addText(this, 149, 81, wrapBitmapText(item.description, 13, 4), 'compact', '#52665c', 6));
       if (this.shopBuying) {
         keep(this.sink, addText(this, 149, 112, `QTY  ${this.shopQuantity}`, 'body', undefined, 6));
         keep(this.sink, addText(this, 149, 124, `TOTAL ${item.price * this.shopQuantity} L`, 'compact', '#9a632d', 6));

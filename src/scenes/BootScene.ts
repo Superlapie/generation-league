@@ -1,21 +1,19 @@
 import Phaser from 'phaser';
 import { SPECIES } from '../data';
-import { configureGbaCamera } from '../display';
-import { registerUiIcons } from '../ui/icons';
-import { ensurePixelFont } from '../ui/typography';
+import { configureUiCamera } from '../display';
+import { configureUiIcons, loadUiIcons } from '../ui/icons';
 import { walkFrames } from '../world';
 
 export class BootScene extends Phaser.Scene {
   constructor() { super('Boot'); }
   preload() {
-    configureGbaCamera(this);
+    configureUiCamera(this);
     this.cameras.main.setBackgroundColor('#101810');
     const loading=this.add.graphics();loading.fillStyle(0x243527).fillRect(29,100,182,12);loading.fillStyle(0xdfe8bf).fillRect(31,102,178,8);
     const bar=this.add.rectangle(33,104,0,4,0x6f9d5a).setOrigin(0);
-    this.add.text(120,55,'GENERATION\nLEAGUE',{fontFamily:'Arial, "Segoe UI", sans-serif',fontStyle:'bold',fontSize:'15px',align:'center',color:'#dfe8bf',resolution:4}).setOrigin(.5);
-    const status=this.add.text(120,118,'PREPARING THE REGION…',{fontFamily:'Arial, "Segoe UI", sans-serif',fontStyle:'bold',fontSize:'7px',color:'#8fa784',resolution:4}).setOrigin(.5);
-    this.load.on('progress',(value:number)=>{bar.width=174*value;status.setText(`PREPARING THE REGION… ${Math.floor(value*100)}%`);});
+    this.load.on('progress',(value:number)=>{bar.width=174*value;});
     this.load.setPath('/');
+    loadUiIcons(this);
     Object.values(SPECIES).forEach((species) => {
       const spriteRoot = species.spriteSheet.includes('/expansion/') ? 'assets/creatures/expansion/optimized' : 'assets/creatures/optimized';
       this.load.image(`${species.id}-front`,`${spriteRoot}/${species.id}-front.png`);
@@ -45,7 +43,6 @@ export class BootScene extends Phaser.Scene {
     this.load.audio('music-dream','assets/ninja-adventure/music/theme_dream.ogg');
   }
   create() {
-    ensurePixelFont().catch(() => undefined);
     document.body.dataset.gameScene='title';
     this.game.canvas.style.imageRendering = 'pixelated';
     const make = (key: string, draw: (g: Phaser.GameObjects.Graphics) => void) => {
@@ -67,7 +64,7 @@ export class BootScene extends Phaser.Scene {
     make('pixel-circle',(g) => g.fillStyle(0xffffff).fillCircle(8,8,4));
     make('field-sign',(g) => { g.fillStyle(0x3b2c25).fillRect(7,8,2,8);g.fillStyle(0x7d5639).fillRect(2,2,12,9);g.fillStyle(0xd4a55e).fillRect(3,3,10,6);g.fillStyle(0x4e382a).fillRect(4,4,8,1).fillRect(4,6,6,1); });
     Object.values(this.textures.list).forEach((texture) => texture.setFilter(Phaser.Textures.FilterMode.NEAREST));
-    registerUiIcons(this);
+    configureUiIcons(this);
     const directionFrames = { down: walkFrames('down'), up: walkFrames('up'), left: walkFrames('left'), right: walkFrames('right') };
     for (const avatar of ['a','b']) for (const [direction,frames] of Object.entries(directionFrames)) {
       this.anims.create({key:`${avatar}-${direction}`,frames:frames.map((frame)=>({key:`avatar-${avatar}`,frame})),frameRate:20,repeat:-1});
